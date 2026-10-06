@@ -2,13 +2,17 @@ package com.worxbend.zephyr
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -84,8 +90,6 @@ import com.worxbend.zephyr.viewmodel.ZephyrViewModel
 import org.jetbrains.compose.resources.painterResource
 import zephyr.shared.generated.resources.Res
 import zephyr.shared.generated.resources.ic_arrow_left
-import zephyr.shared.generated.resources.ic_moon
-import zephyr.shared.generated.resources.ic_sun
 
 private fun zephyrActionHandler(viewModel: ZephyrViewModel): ZephyrActionHandler =
     ZephyrActionHandler { request ->
@@ -176,7 +180,10 @@ internal fun ZephyrScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
+                if (event.type == KeyEventType.KeyDown && event.key == Key.Escape && navigationOverlayOpen) {
+                    navigationOverlayOpen = false
+                    true
+                } else if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
                     false
                 } else {
                     val workspaceRoute = event.key.toWorkspaceShortcutKey()?.let { key ->
@@ -218,7 +225,7 @@ internal fun ZephyrScreen(
                 }
             },
     ) {
-        val shellLayout = shellLayoutForWidth(maxWidth.value)
+        val shellLayout = shellLayoutForWidth(maxWidth.value / zephyrContentScale())
         LaunchedEffect(shellLayout) {
             if (shellLayout.hasPersistentNavigation) navigationOverlayOpen = false
         }
@@ -271,8 +278,15 @@ internal fun ZephyrScreen(
                     )
                 }
                 if (shellLayout == ShellLayout.Narrow && navigationOverlayOpen) {
+                    Box(
+                        Modifier.fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.24f))
+                            .semantics { contentDescription = "Close navigation" }
+                            .clickable { navigationOverlayOpen = false },
+                    )
                     Surface(
-                        modifier = Modifier.fillMaxHeight().widthIn(max = 320.dp).fillMaxWidth(),
+                        modifier = Modifier.fillMaxHeight().widthIn(max = 320.dp).fillMaxWidth().padding(end = 8.dp),
+                        shape = MaterialTheme.shapes.large,
                         color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 12.dp,
                     ) {
@@ -324,14 +338,17 @@ internal fun TransactionPreviewDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(transaction.title) },
+        shape = MaterialTheme.shapes.large,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.large),
+        title = { Text(transaction.title, style = MaterialTheme.typography.titleLarge) },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 440.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(LocalZephyrMetrics.current.panelPadding),
             ) {
                 Text(transaction.description)
                 Badge(
@@ -345,11 +362,10 @@ internal fun TransactionPreviewDialog(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    ZephyrPanel(Modifier.fillMaxWidth().heightIn(max = 260.dp)) {
+                    ZephyrPanel(Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier
-                                .padding(LocalZephyrMetrics.current.panelPadding)
-                                .verticalScroll(rememberScrollState()),
+                                .padding(LocalZephyrMetrics.current.panelPadding),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             transaction.commands.forEachIndexed { index, command ->
@@ -393,18 +409,11 @@ private fun DiskImpactSummary(estimate: DiskImpactEstimate) {
             modifier = Modifier.padding(LocalZephyrMetrics.current.panelPadding),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, fontWeight = FontWeight.SemiBold)
-                Text(value, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(value, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     estimate.confidence.label,
                     style = MaterialTheme.typography.labelSmall,
@@ -443,16 +452,23 @@ private fun PlannedCommandRow(
     step: Int,
     command: PlannedSdkmanCommand,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Badge(step.toString())
-        Text(command.action.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-        command.candidate?.let { Badge(it, BadgeTone.Primary) }
-        command.version?.let { Badge(it) }
-        CopyTextButton(command.copyableCommand(), "Copy command")
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ZephyrKeycap(step.toString())
+            Text(command.action.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+            CopyTextButton(command.copyableCommand(), "Copy command")
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            command.candidate?.let { Badge(it, BadgeTone.Primary) }
+            command.version?.let { Badge(it) }
+        }
     }
 }
 
@@ -475,91 +491,64 @@ private fun WorkbenchToolbar(
 ) {
     val metrics = LocalZephyrMetrics.current
     val busy = state.busyLabel() != null
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(metrics.toolbarHeight),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(0.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 0.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compactHeader = maxWidth < 600.dp * zephyrContentScale()
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(metrics.toolbarHeight),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shadowElevation = 0.dp,
         ) {
-            if (layout == ShellLayout.Narrow) {
-                ZephyrToolbarButton("Menu", onClick = onToggleNavigation)
-            }
-            if (state.previousRoute != null) {
-                IconButton(onClick = onBack, modifier = Modifier.size(metrics.controlHeight)) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_arrow_left),
-                        contentDescription = "Back",
-                        modifier = Modifier.size(18.dp),
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = if (compactHeader) 6.dp else metrics.panelPadding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compactHeader) 4.dp else metrics.spacing),
+            ) {
+                if (layout == ShellLayout.Narrow) {
+                    ZephyrToolbarButton("Menu", onClick = onToggleNavigation)
+                }
+                if (state.previousRoute != null) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(metrics.controlHeight)) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_arrow_left),
+                            contentDescription = "Back",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        headerTitle(state),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!compactHeader) {
+                        Text(
+                            if (showSdkmanHome) state.sdkmanStatus.home.orEmpty() else sdkmanVersionLabel(state),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.MiddleEllipsis,
+                        )
+                    }
+                }
+                if (layout == ShellLayout.Wide) {
+                    GlobalSearchButton(onClick = onOpenSearch)
+                } else {
+                    ZephyrToolbarButton("Find", onClick = onOpenSearch)
+                }
+                val unreadActivity = state.activityEvents.count { !it.acknowledged }
+                if (!compactHeader) {
+                    ZephyrToolbarButton(
+                        label = "Activity",
+                        detail = unreadActivity.takeIf { it > 0 }?.toString(),
+                        onClick = onToggleActivity,
                     )
                 }
-            }
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(7.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Z", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-            }
-            Column(
-                if (layout == ShellLayout.Wide) Modifier.width(190.dp) else Modifier.weight(1f),
-            ) {
-                Text(
-                    headerTitle(state),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    if (showSdkmanHome) state.sdkmanStatus.home.orEmpty() else sdkmanVersionLabel(state),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.MiddleEllipsis,
-                )
-            }
-            if (layout == ShellLayout.Wide) {
-                Spacer(Modifier.weight(1f))
-                GlobalSearchButton(onClick = onOpenSearch)
-            } else {
-                ZephyrToolbarButton("Find", onClick = onOpenSearch)
-            }
-            val unreadActivity = state.activityEvents.count { !it.acknowledged }
-            ZephyrToolbarButton(
-                label = "Activity",
-                detail = unreadActivity.takeIf { it > 0 }?.toString(),
-                onClick = onToggleActivity,
-            )
-            if (layout.showsFullToolbar) {
-                HeaderThemeButton(darkTheme = darkTheme, onClick = onToggleTheme)
-                ZephyrToolbarButton(
-                    label = "Network",
-                    detail = state.connectivityStatus.state.label.lowercase(),
-                    onClick = onRefreshConnectivity,
-                    enabled = state.connectivityStatus.state != ConnectivityState.Checking,
-                )
-                ZephyrToolbarButton("Refresh", onClick = onRefresh, enabled = !busy)
-                ZephyrToolbarButton(
-                    label = "Metadata",
-                    detail = metadataShortLabel(state.sdkmanStatus.metadataStatus),
-                    onClick = onRefreshMetadata,
-                    enabled = !busy,
-                )
-                ZephyrToolbarButton("Scan", onClick = onScan, enabled = !busy)
-                ZephyrToolbarButton(
-                    label = "SDKMAN update",
-                    detail = selfUpdateShortLabel(state.sdkmanStatus.selfUpdateStatus),
-                    onClick = onCheckUpdates,
-                    enabled = !busy,
-                )
-            } else {
                 ToolbarOverflow(
+                    showActivity = compactHeader,
+                    onToggleActivity = onToggleActivity,
                     darkTheme = darkTheme,
                     networkLabel = state.connectivityStatus.state.label,
                     metadataLabel = metadataShortLabel(state.sdkmanStatus.metadataStatus),
@@ -581,6 +570,8 @@ private fun WorkbenchToolbar(
 
 @Composable
 private fun ToolbarOverflow(
+    showActivity: Boolean,
+    onToggleActivity: () -> Unit,
     darkTheme: Boolean,
     networkLabel: String,
     metadataLabel: String,
@@ -602,6 +593,12 @@ private fun ToolbarOverflow(
     Box {
         ZephyrToolbarButton("More", onClick = { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (showActivity) {
+                DropdownMenuItem(
+                    text = { Text("Activity") },
+                    onClick = { runAndClose(onToggleActivity) },
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Network · ${networkLabel.lowercase()}") },
                 enabled = !connectivityChecking,
@@ -646,22 +643,20 @@ private fun ActivityCenterPanel(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = metrics.toolbarHeight + 8.dp, start = 16.dp, end = 16.dp),
+            .padding(top = metrics.toolbarHeight + 8.dp, start = 12.dp, end = 12.dp, bottom = metrics.statusBarHeight + 8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
             Surface(
-                modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth().heightIn(max = 520.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(metrics.cornerRadius),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth().heightIn(max = 560.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 shadowElevation = 10.dp,
             ) {
                 Column(
-                    modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                        .padding(metrics.panelPadding),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(metrics.panelPadding),
+                    verticalArrangement = Arrangement.spacedBy(metrics.spacing),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -674,8 +669,10 @@ private fun ActivityCenterPanel(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
+                        Badge(state.activityEvents.size.toString(), BadgeTone.Primary)
                         TextButton(onClick = onClose) { Text("Close") }
                     }
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
                     if (state.activityEvents.isEmpty()) {
                         Text(
                             "No recent activity.",
@@ -683,38 +680,56 @@ private fun ActivityCenterPanel(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
-                        state.activityEvents.forEach { event ->
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(5.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                ) {
-                                    Badge(
-                                        event.severity.label,
-                                        when (event.severity) {
-                                            ActivitySeverity.Success -> BadgeTone.Success
-                                            ActivitySeverity.Warning -> BadgeTone.Warning
-                                            ActivitySeverity.Error -> BadgeTone.Error
-                                            ActivitySeverity.Info -> BadgeTone.Neutral
-                                        },
-                                    )
-                                    Text(
-                                        formatLocalTimestamp(event.timestampEpochMillis),
-                                        modifier = Modifier.weight(1f),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    if (!event.acknowledged) {
-                                        TextButton(onClick = { onDismissEvent(event.id) }) { Text("Dismiss") }
-                                    }
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(metrics.spacing),
+                        ) {
+                            items(state.activityEvents, key = { it.id }) { event ->
+                                val semanticColors = LocalZephyrColors.current
+                                val accent = when (event.severity) {
+                                    ActivitySeverity.Success -> semanticColors.success
+                                    ActivitySeverity.Warning -> semanticColors.warning
+                                    ActivitySeverity.Error -> MaterialTheme.colorScheme.error
+                                    ActivitySeverity.Info -> semanticColors.info
                                 }
-                                Text(event.message, style = MaterialTheme.typography.bodySmall)
-                                event.action?.let { action ->
-                                    TextButton(onClick = { onAction(action) }) { Text(action.label) }
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = MaterialTheme.shapes.small,
+                                    border = BorderStroke(1.dp, if (event.acknowledged) MaterialTheme.colorScheme.outlineVariant else accent.copy(alpha = 0.6f)),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                        ) {
+                                            Badge(
+                                                event.severity.label,
+                                                when (event.severity) {
+                                                    ActivitySeverity.Success -> BadgeTone.Success
+                                                    ActivitySeverity.Warning -> BadgeTone.Warning
+                                                    ActivitySeverity.Error -> BadgeTone.Error
+                                                    ActivitySeverity.Info -> BadgeTone.Neutral
+                                                },
+                                            )
+                                            Text(
+                                                formatLocalTimestamp(event.timestampEpochMillis),
+                                                modifier = Modifier.weight(1f),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            if (!event.acknowledged) {
+                                                TextButton(onClick = { onDismissEvent(event.id) }) { Text("Dismiss") }
+                                            }
+                                        }
+                                        Text(event.message, style = MaterialTheme.typography.bodyMedium)
+                                        event.action?.let { action ->
+                                            TextButton(onClick = { onAction(action) }) { Text(action.label) }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -730,9 +745,9 @@ private fun GlobalSearchButton(onClick: () -> Unit) {
     val metrics = LocalZephyrMetrics.current
     Surface(
         onClick = onClick,
-        modifier = Modifier.width(190.dp).height(metrics.controlHeight),
+        modifier = Modifier.width(250.dp).height(metrics.controlHeight),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(metrics.cornerRadius),
+        shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
@@ -740,14 +755,15 @@ private fun GlobalSearchButton(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Text("⌕", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "Search / commands",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Badge("Ctrl/⌘ K")
+            ZephyrKeycap("Ctrl/⌘ K")
         }
     }
 }
@@ -771,10 +787,10 @@ private fun WorkbenchSidebar(
         modifier = Modifier
             .width(width)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(horizontal = metrics.spacing, vertical = metrics.panelPadding),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ZephyrSectionLabel("Tasks")
         ZephyrNavigationItem(
@@ -890,7 +906,11 @@ private fun NavigationTaskGroup(
         onClick = onToggle,
         badge = badge,
     )
-    if (expanded) children()
+    if (expanded) {
+        Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            children()
+        }
+    }
 }
 
 @Composable
@@ -954,16 +974,28 @@ private fun WorkbenchStatusBar(
     val busyLabel = state.busyLabel()
     Surface(
         modifier = Modifier.fillMaxWidth().height(metrics.statusBarHeight),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+            modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(horizontal = metrics.spacing),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusDot(if (busyLabel == null) StatusTone.Success else StatusTone.Accent)
-            Text(busyLabel ?: "Ready", style = MaterialTheme.typography.labelSmall)
+            Surface(
+                color = if (busyLabel == null) LocalZephyrColors.current.successContainer else MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (busyLabel == null) LocalZephyrColors.current.onSuccess else MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = MaterialTheme.shapes.extraSmall,
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(if (busyLabel == null) "✓" else "↻", style = MaterialTheme.typography.labelSmall)
+                    Text(busyLabel ?: "Ready", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            }
             state.localOnlyScanProgress?.let { progress ->
                 val summary = "${progress.completed}/${progress.total} audited, " +
                     "${progress.trustedFindings.sumOf { it.localOnlyVersionCount }} findings, " +
@@ -1046,7 +1078,7 @@ private fun WorkbenchStatusBar(
                     maxLines = 1,
                 )
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(metrics.spacing))
             if (showSdkmanHome && !compact) {
                 Text(
                     state.sdkmanStatus.home.orEmpty(),
@@ -1069,28 +1101,6 @@ private fun WorkbenchStatusBar(
     }
 }
 
-@Composable
-private fun HeaderThemeButton(
-    darkTheme: Boolean,
-    onClick: () -> Unit,
-) {
-    val metrics = LocalZephyrMetrics.current
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.size(metrics.controlHeight),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(metrics.cornerRadius),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                painter = painterResource(if (darkTheme) Res.drawable.ic_sun else Res.drawable.ic_moon),
-                contentDescription = if (darkTheme) "Switch to light theme" else "Switch to dark theme",
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
 
 private fun ZephyrUiState.Ready.busyLabel(): String? =
     when {
