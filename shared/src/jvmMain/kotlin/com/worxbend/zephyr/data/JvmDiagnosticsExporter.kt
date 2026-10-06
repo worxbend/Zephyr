@@ -42,7 +42,7 @@ private fun DiagnosticsSnapshot.toSupportText(): String = buildString {
     appendLine("Zephyr Support Bundle")
     appendLine("=====================")
     appendLine("Generated: ${formatLocalTimestamp(generatedAtEpochMillis)}")
-    appendLine("Zephyr: 1.0.0")
+    appendLine("Zephyr: 1.1.0")
     appendLine("OS: ${System.getProperty("os.name")} ${System.getProperty("os.version")}")
     appendLine("Java: ${System.getProperty("java.version")}")
     appendLine()

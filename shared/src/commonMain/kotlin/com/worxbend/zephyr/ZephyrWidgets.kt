@@ -1,5 +1,19 @@
 package com.worxbend.zephyr
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -73,13 +87,12 @@ internal fun ZephyrPanel(
 ) {
     val metrics = LocalZephyrMetrics.current
     Surface(
-        modifier = modifier.border(
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            RoundedCornerShape(metrics.cornerRadius),
-        ),
+        modifier = modifier,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(metrics.cornerRadius),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
+        shadowElevation = 1.dp,
         content = content,
     )
 }
@@ -91,14 +104,27 @@ internal fun ZephyrClickablePanel(
     content: @Composable () -> Unit,
 ) {
     val metrics = LocalZephyrMetrics.current
+    val interactions = remember { MutableInteractionSource() }
+    val hovered by interactions.collectIsHoveredAsState()
+    val focused by interactions.collectIsFocusedAsState()
+    val pressed by interactions.collectIsPressedAsState()
+    val fill = zephyrAnimatedColor(
+        when {
+            pressed -> MaterialTheme.colorScheme.primaryContainer
+            hovered || focused -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        },
+    )
     Surface(
-        modifier = modifier.border(
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            RoundedCornerShape(metrics.cornerRadius),
-        ),
+        modifier = modifier.hoverable(interactions),
         onClick = onClick,
+        interactionSource = interactions,
+        border = BorderStroke(
+            if (focused) 2.dp else 1.dp,
+            if (focused || hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         shape = RoundedCornerShape(metrics.cornerRadius),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = fill,
         tonalElevation = 0.dp,
         content = content,
     )
@@ -110,7 +136,7 @@ internal fun ZephyrSectionLabel(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = text.uppercase(),
+        text = text,
         modifier = modifier.padding(horizontal = 10.dp, vertical = 6.dp),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.labelSmall,
@@ -128,8 +154,16 @@ internal fun ZephyrNavigationItem(
     badge: String? = null,
 ) {
     val metrics = LocalZephyrMetrics.current
+    val interactions = remember { MutableInteractionSource() }
+    val hovered by interactions.collectIsHoveredAsState()
     var focused by remember { mutableStateOf(false) }
-    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val background = zephyrAnimatedColor(
+        when {
+            selected -> MaterialTheme.colorScheme.primaryContainer
+            hovered -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> Color.Transparent
+        },
+    )
     val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = modifier
@@ -143,6 +177,8 @@ internal fun ZephyrNavigationItem(
             )
             .onFocusChanged { focused = it.isFocused }
             .semantics { this.selected = selected }
+            .clip(RoundedCornerShape(metrics.cornerRadius))
+            .hoverable(interactions)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -188,11 +224,22 @@ internal fun ZephyrToolbarButton(
 ) {
     val metrics = LocalZephyrMetrics.current
     val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val pressed by interactionSource.collectIsPressedAsState()
     var focused by remember { mutableStateOf(false) }
+    val fill = zephyrAnimatedColor(
+        when {
+            enabled && pressed -> MaterialTheme.colorScheme.primaryContainer
+            enabled && hovered -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceContainer
+        },
+    )
     Surface(
         modifier = modifier
             .height(metrics.controlHeight)
             .alpha(if (enabled) 1f else 0.5f)
+            .clip(RoundedCornerShape(metrics.cornerRadius))
+            .hoverable(interactionSource, enabled)
             .onFocusChanged { focused = it.isFocused }
             .clickable(
                 interactionSource = interactionSource,
@@ -201,11 +248,11 @@ internal fun ZephyrToolbarButton(
                 role = Role.Button,
                 onClick = onClick,
             ),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = fill,
         shape = RoundedCornerShape(metrics.cornerRadius),
         border = BorderStroke(
             1.dp,
-            if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            if (focused || (enabled && hovered)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
         ),
     ) {
         Row(
@@ -240,7 +287,7 @@ internal fun ZephyrMetricTile(
                 StatusDot(tone)
                 Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = statusColor(tone))
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -254,16 +301,31 @@ internal fun ZephyrSettingsRow(
     control: @Composable RowScope.() -> Unit,
 ) {
     val metrics = LocalZephyrMetrics.current
-    Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = metrics.spacing),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (maxWidth < 580.dp * zephyrContentScale()) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = metrics.spacing),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, content = control)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = metrics.spacing),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                control()
+            }
         }
-        control()
     }
 }
 
@@ -276,28 +338,39 @@ internal fun <T> ZephyrSegmentedControl(
     modifier: Modifier = Modifier,
 ) {
     val metrics = LocalZephyrMetrics.current
-    Row(
+    FlowRow(
         modifier = modifier
+            .selectableGroup()
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(metrics.cornerRadius))
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { option ->
             val active = option == selected
-            Text(
-                text = label(option),
-                modifier = Modifier
-                    .height(metrics.controlHeight - 4.dp)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        RoundedCornerShape((metrics.cornerRadius - 2.dp).coerceAtLeast(2.dp)),
-                    )
-                    .semantics { this.selected = active }
-                    .clickable(role = Role.RadioButton) { onSelected(option) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
+            var focused by remember { mutableStateOf(false) }
+            val shape = RoundedCornerShape((metrics.cornerRadius - 4.dp).coerceAtLeast(4.dp))
+            val fill = zephyrAnimatedColor(
+                if (active) MaterialTheme.colorScheme.surface else Color.Transparent,
             )
+            Box(
+                modifier = Modifier
+                    .heightIn(min = metrics.controlHeight - 4.dp)
+                    .clip(shape)
+                    .background(fill)
+                    .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+                    .onFocusChanged { focused = it.isFocused }
+                    .selectable(selected = active, role = Role.RadioButton) { onSelected(option) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label(option),
+                    color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
         }
     }
 }
@@ -335,16 +408,10 @@ internal fun StatusDot(
     tone: StatusTone,
     modifier: Modifier = Modifier,
 ) {
-    val color = when (tone) {
-        StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
-        StatusTone.Accent -> MaterialTheme.colorScheme.primary
-        StatusTone.Success -> Color(0xFF59A869)
-        StatusTone.Warning -> Color(0xFFE2A53A)
-        StatusTone.Error -> MaterialTheme.colorScheme.error
-    }
+    val color = statusColor(tone)
     Box(
         modifier = modifier
-            .size(14.dp)
+            .size(14.dp * (LocalZephyrMetrics.current.controlHeight.value / 36f))
             .background(color.copy(alpha = 0.16f), RoundedCornerShape(99.dp))
             .semantics { contentDescription = "${statusLabel(tone)} status" },
         contentAlignment = Alignment.Center,
@@ -373,10 +440,33 @@ internal fun ZephyrProgressIndicator(
         ) {
             StatusDot(StatusTone.Accent)
         }
+    } else if (compact) {
+        CircularProgressIndicator(modifier = modifier.size(size), strokeWidth = 2.dp)
     } else {
-        CircularProgressIndicator(
-            modifier = modifier.size(size),
-            strokeWidth = if (compact) 2.dp else 4.dp,
+        LinearProgressIndicator(
+            modifier = modifier.width(120.dp).height(5.dp).clip(MaterialTheme.shapes.small),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
     }
+}
+
+@Composable
+internal fun statusColor(tone: StatusTone): Color = when (tone) {
+    StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+    StatusTone.Accent -> MaterialTheme.colorScheme.primary
+    StatusTone.Success -> LocalZephyrColors.current.success
+    StatusTone.Warning -> LocalZephyrColors.current.warning
+    StatusTone.Error -> MaterialTheme.colorScheme.error
+}
+
+/** Only user-driven color transitions animate; reduced motion switches immediately. */
+@Composable
+internal fun zephyrAnimatedColor(target: Color): Color {
+    val color by animateColorAsState(
+        targetValue = target,
+        animationSpec = tween(if (LocalReducedMotion.current) 0 else 140),
+        label = "Control feedback",
+    )
+    return color
 }
