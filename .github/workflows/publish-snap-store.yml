@@ -95,7 +95,7 @@ jobs:
       - name: Publish released Snap to stable
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ env.STORE_LOGIN }}
-        uses: snapcore/action-publish@9334eecb267cfd97a0ce3c8654215d095927252f # v1.2.0
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
         with:
           snap: ${{ steps.download.outputs.snap_path }}
           release: stable
