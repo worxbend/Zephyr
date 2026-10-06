@@ -1,6 +1,6 @@
 # Linux distribution
 
-Zephyr `1.0.0` is packaged natively on GitHub-hosted `amd64` and `arm64`
+Zephyr `1.1.0` is packaged natively on GitHub-hosted `amd64` and `arm64`
 machines. Native builds matter because Compose Desktop bundles an
 architecture-specific JVM and Skiko library; the build does not cross-compile
 those components.
@@ -48,7 +48,8 @@ Generated release files are written to `dist/`.
 
 For a version bump, update `zephyrVersion` in `gradle.properties`, the Snap
 `version` in `snap/snapcraft.yaml`, and the AppStream release in
-`packaging/linux/com.worxbend.zephyr.metainfo.xml` together.
+`packaging/linux/com.worxbend.zephyr.metainfo.xml` together. Also update the
+About screen and diagnostics support-bundle version labels.
 
 ## AppImage design
 
@@ -71,7 +72,7 @@ classic confinement are approved and the secret is configured, publish the
 already-verified release assets without rebuilding them:
 
 ```shell
-gh workflow run publish-snap-store.yml -f release_tag=v1.0.0
+gh workflow run publish-snap-store.yml -f release_tag=v1.1.0
 ```
 
 The dedicated workflow downloads each architecture's `.snap` and
