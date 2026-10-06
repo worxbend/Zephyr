@@ -1,6 +1,7 @@
 package com.worxbend.zephyr
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -8,7 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.worxbend.zephyr.domain.Candidate
 import com.worxbend.zephyr.domain.CandidateCatalogItem
@@ -32,6 +32,41 @@ import com.worxbend.zephyr.domain.JavaVersion
 import com.worxbend.zephyr.domain.ProtectedVersion
 import com.worxbend.zephyr.domain.javaProviderName
 import com.worxbend.zephyr.data.createClipboardService
+
+/** Keep record identity readable before allowing actions to wrap underneath it. */
+@Composable
+internal fun ZephyrRecordLayout(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+    actions: @Composable () -> Unit,
+) {
+    val fontScale = zephyrContentScale()
+    BoxWithConstraints(modifier) {
+        val actionWidth = maxWidth * 0.55f
+        if (maxWidth < 760.dp * fontScale) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                content()
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) { actions() }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) { content() }
+                FlowRow(
+                    modifier = Modifier.widthIn(max = actionWidth),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) { actions() }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun CandidateGrid(
@@ -44,7 +79,7 @@ internal fun CandidateGrid(
 ) {
     val spacing = LocalZephyrMetrics.current.spacing
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(250.dp),
+        columns = GridCells.Adaptive(280.dp * zephyrContentScale()),
         verticalArrangement = Arrangement.spacedBy(spacing),
         horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
@@ -95,16 +130,18 @@ internal fun CandidateTable(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 ZephyrClickablePanel(onClick = { onOpen(candidate) }, modifier = Modifier.fillMaxWidth()) {
-                    Row(
+                    ZephyrRecordLayout(
                         modifier = Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        content = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                CandidateIcon(candidate.kind)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(candidate.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(candidate.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        },
                     ) {
-                        CandidateIcon(candidate.kind)
-                        Column(Modifier.weight(1f)) {
-                            Text(candidate.displayName, fontWeight = FontWeight.SemiBold)
-                            Text(candidate.name, style = MaterialTheme.typography.bodySmall)
-                        }
                         Text(
                             "${candidate.installedVersions.count { it.isInstalled }} installed",
                             style = MaterialTheme.typography.bodySmall,
@@ -149,16 +186,18 @@ internal fun PackageTable(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 ZephyrClickablePanel(onClick = { onOpen(item) }, modifier = Modifier.fillMaxWidth()) {
-                    Row(
+                    ZephyrRecordLayout(
                         modifier = Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        content = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                CandidateIcon(item.kind)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(item.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(item.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        },
                     ) {
-                        CandidateIcon(item.kind)
-                        Column(Modifier.weight(1f)) {
-                            Text(item.displayName, fontWeight = FontWeight.SemiBold)
-                            Text(item.name, style = MaterialTheme.typography.bodySmall)
-                        }
                         item.stableVersion?.let { Badge("Stable: $it", BadgeTone.Success) }
                         if (item.isInstalled) Badge("Installed", BadgeTone.Primary)
                         if (favorite) Badge("Favorite", BadgeTone.Primary)
@@ -201,10 +240,9 @@ internal fun CandidateCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     CandidateIcon(candidate.kind)
                     Column(Modifier.weight(1f)) {
-                        Text(candidate.displayName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("SDKMAN key: ${candidate.name}", style = MaterialTheme.typography.bodySmall)
+                        Text(candidate.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("SDKMAN key: ${candidate.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    CopyTextButton(candidate.name, "Copy key")
                 }
                 LinkText(
                     text = candidate.description ?: "${candidate.installedVersions.count { it.isInstalled }} installed version(s)",
@@ -218,10 +256,15 @@ internal fun CandidateCard(
                     if (reviewDueCount > 0) Badge("$reviewDueCount review due", BadgeTone.Error)
                     if (protectedLocalOnlyCount > 0) Badge("$protectedLocalOnlyCount protected", BadgeTone.Primary)
                 }
-                if (candidate.hasLocalOnlyVersions) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CopyTextButton(candidate.name, "Copy key")
+                    if (candidate.hasLocalOnlyVersions) {
                         if (cleanable) {
-                            OutlinedButton(onClick = onClean, modifier = Modifier.height(34.dp)) {
+                            OutlinedButton(onClick = onClean, modifier = Modifier.heightIn(min = metrics.controlHeight)) {
                                 Text("Clean unprotected", style = MaterialTheme.typography.labelLarge)
                             }
                         } else if (cleanupEvidenceTrusted) {
@@ -271,10 +314,9 @@ internal fun PackageCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     CandidateIcon(item.kind)
                     Column(Modifier.weight(1f)) {
-                        Text(item.displayName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("SDKMAN key: ${item.name}", style = MaterialTheme.typography.bodySmall)
+                        Text(item.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("SDKMAN key: ${item.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    CopyTextButton(item.name, "Copy key")
                 }
                 LinkText(item.description ?: "Available from SDKMAN.", Modifier.weight(1f, fill = false), maxLines = 2)
                 Spacer(Modifier.weight(1f))
@@ -283,9 +325,14 @@ internal fun PackageCard(
                     if (item.isInstalled) Badge("Installed", BadgeTone.Primary)
                     if (isFavorite) Badge("Favorite", BadgeTone.Primary)
                 }
-                if (onToggleFavorite != null) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        OutlinedButton(onClick = onToggleFavorite, modifier = Modifier.height(34.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CopyTextButton(item.name, "Copy key")
+                    if (onToggleFavorite != null) {
+                        OutlinedButton(onClick = onToggleFavorite, modifier = Modifier.heightIn(min = metrics.controlHeight)) {
                             Text(if (isFavorite) "★ Favorited" else "☆ Favorite")
                         }
                     }
@@ -320,26 +367,28 @@ internal fun JdkVersionCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         ZephyrPanel {
-            Row(
-                Modifier.fillMaxWidth().padding(metrics.panelPadding),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CandidateIcon(CandidateKind.Jdk)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("JDK ${version.featureVersion}", fontWeight = FontWeight.SemiBold)
-                    Text(version.identifier)
-                    Text(version.providerName ?: javaProviderName(version.providerCode) ?: "Provider unknown", style = MaterialTheme.typography.bodySmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Badge("SDKMAN key: java")
-                        if (version.identifier == default) Badge("Default", BadgeTone.Primary)
-                        when {
-                            version.isConfirmedLocalOnly -> Badge("Local only", BadgeTone.Warning)
-                            !version.isRemoteAvailable -> Badge("Availability unknown", BadgeTone.Neutral)
+            ZephyrRecordLayout(
+                modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
+                content = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                        CandidateIcon(CandidateKind.Jdk)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("JDK ${version.featureVersion}", fontWeight = FontWeight.SemiBold)
+                            Text(version.identifier, style = MaterialTheme.typography.bodyMedium)
+                            Text(version.providerName ?: javaProviderName(version.providerCode) ?: "Provider unknown", style = MaterialTheme.typography.bodySmall)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Badge("SDKMAN key: java")
+                                if (version.identifier == default) Badge("Default", BadgeTone.Primary)
+                                when {
+                                    version.isConfirmedLocalOnly -> Badge("Local only", BadgeTone.Warning)
+                                    !version.isRemoteAvailable -> Badge("Availability unknown", BadgeTone.Neutral)
+                                }
+                                if (isProtected) Badge("Protected", BadgeTone.Primary)
+                            }
                         }
-                        if (isProtected) Badge("Protected", BadgeTone.Primary)
                     }
-                }
+                },
+            ) {
                 CopyTextButton(version.identifier, "Copy version")
                 if (onOpenTerminal != null) {
                     OutlinedButton(onClick = onOpenTerminal) { Text("Terminal") }
