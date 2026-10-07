@@ -60,8 +60,20 @@ jobs:
           distribution: corretto
           java-version: "21"
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Install native UI test dependencies
+        run: bash .github/scripts/install-linux-ui-deps.sh
       - name: Run tests and build bundled JVM application
         run: ./gradlew check :desktopApp:createDistributable --console=plain
+      - name: Retain test failure details
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-failures-${{ matrix.arch }}
+          path: |
+            shared/build/test-results/
+            shared/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Preserve executable bits and symlinks
         run: tar -C desktopApp/build/compose/binaries/main/app -czf "$RUNNER_TEMP/native-image.tar.gz" .
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

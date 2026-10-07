@@ -42,6 +42,9 @@ jobs:
       - name: Install package inspection tools
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends squashfs-tools appstream
 
+      - name: Install native UI test dependencies
+        run: bash .github/scripts/install-linux-ui-deps.sh
+
       - name: Verify
         run: ./gradlew check :desktopApp:createDistributable --console=plain
 
