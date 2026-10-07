@@ -4,20 +4,54 @@
 # No JDK is installed here: Gradle's daemon requires AMAZON, not Ubuntu OpenJDK.
 name: zephyr
 title: Zephyr
-summary: Manage SDKMAN toolchains from the desktop
+summary: Manage Java and SDKMAN toolchains from your Linux desktop
 description: |
-  Zephyr is a desktop interface for SDKMAN. It inventories installed JDKs and
-  SDKs, reviews updates and local-only versions, and keeps all changes behind
-  an explicit transaction preview.
+  Browse, install, switch, and clean up Java development kits and SDKs with
+  Zephyr, a Linux desktop interface for SDKMAN. Work with your existing SDKMAN
+  installation instead of maintaining a separate set of development tools.
 
-  This snap uses classic confinement because Zephyr operates on the user's
-  existing SDKMAN installation and launches host toolchains and terminals.
+  Find local-only versions that are still installed but no longer appear in
+  SDKMAN's catalog. Review removals before they run, with protection for your
+  current defaults and pinned versions.
+
+  What you can do:
+  - Browse JDKs by vendor and version, and discover SDKMAN SDKs and build tools.
+  - Install and uninstall versions, set defaults, and review updates in one place.
+  - Preview SDKMAN commands before confirming changes, including batch operations.
+  - Save toolchain profiles, import and export .sdkmanrc files, and review
+    environment snapshots before restoring installed versions and defaults.
+  - Search pages, versions, and actions with Ctrl+K or open the command palette
+    with Ctrl+Shift+P.
+  - Inspect diagnostics and operation history, and export support information.
+  - Choose light or dark appearance, compact or comfortable layouts, larger
+    text up to 200%, and reduced motion.
+
+  Getting started:
+  Install SDKMAN for your user account first: https://sdkman.io/install
+  Then open Zephyr from your applications menu or run zephyr in a terminal.
+  Zephyr discovers SDKMAN through SDKMAN_DIR or ~/.sdkman. For a custom
+  location, select your SDKMAN home in Settings and restart Zephyr.
+
+  A Java runtime is included; you do not need to install Java to open Zephyr.
+  Internet access is required to refresh the catalog and download toolchains.
+  Previously cached catalog information remains available offline. Opening an
+  activated shell requires a supported terminal emulator installed on the host.
+
+  Permissions:
+  This snap uses classic confinement to manage your existing SDKMAN files,
+  execute SDKMAN commands, and open host terminals. It is not restricted by
+  the usual strict Snap sandbox. Review each proposed toolchain change before
+  confirming it.
+
+  Zephyr is a graphical frontend to SDKMAN, not a replacement package manager.
+  Source code, documentation, and bug reports:
+  https://github.com/worxbend/Zephyr
 adopt-info: zephyr
 license: MIT
-website: https://github.com/w0rxbend/Zephyr
-source-code: https://github.com/w0rxbend/Zephyr
-issues: https://github.com/w0rxbend/Zephyr/issues
-contact: https://github.com/w0rxbend/Zephyr/issues
+website: https://github.com/worxbend/Zephyr
+source-code: https://github.com/worxbend/Zephyr
+issues: https://github.com/worxbend/Zephyr/issues
+contact: https://github.com/worxbend/Zephyr/issues
 icon: packaging/linux/com.worxbend.zephyr.png
 base: core24
 grade: stable

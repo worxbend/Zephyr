@@ -1,0 +1,42 @@
+{
+  "icon": {
+    "file": "icon.png",
+    "width": 480,
+    "height": 480,
+    "sha256": "1edffff24c12517bd788f666eb58dba4be5e338e0c1a8fc484bcfc00f2990558"
+  },
+  "screenshots": [
+    {
+      "file": "overview-light.png",
+      "caption": "Your SDKMAN toolchains at a glance",
+      "alt": "Zephyr Overview in light mode, showing the default JDK, installed SDK totals, quick actions, and environment health.",
+      "width": 1280,
+      "height": 820,
+      "sha256": "61dea2695797fcabe941a468fc5f4deee78d70e495228358c70cf77bbd3c5cad"
+    },
+    {
+      "file": "installed-jdk-dark.png",
+      "caption": "Manage installed Java versions",
+      "alt": "Installed JDKs in dark mode, with version and vendor grouping, a default marker, and Terminal and Protect actions.",
+      "width": 1280,
+      "height": 820,
+      "sha256": "8cc6f1b804eb1874b1eb480da31c837cbec22dc23599a96964d4e2d53e76af06"
+    },
+    {
+      "file": "search-light.png",
+      "caption": "Find pages, versions, and actions with the keyboard",
+      "alt": "Zephyr global search in light mode, showing workspace destinations, a selected result, and keyboard shortcuts.",
+      "width": 1280,
+      "height": 820,
+      "sha256": "5df9411ab6f588683fc0f37be8894a739daf03bc9c73c01e42d2fcfd861b93ae"
+    },
+    {
+      "file": "settings-dark.png",
+      "caption": "Choose an appearance that works for you",
+      "alt": "Settings in dark mode, with theme, information density, text scaling, motion, and navigation width controls.",
+      "width": 1280,
+      "height": 820,
+      "sha256": "3c474d58e80f1de2bb3e4faf23f94960ed7601cb3b2126fe059895d6e1e2836e"
+    }
+  ]
+}

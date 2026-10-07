@@ -440,11 +440,13 @@ The UI never constructs shell strings directly. All commands go through a typed 
 
 ## Screenshots
 
-![Installed JDK screen](Screenshot-1.png)
+Captured from the running Linux application, with SDKMAN paths hidden.
 
-![Installed SDKs screen](Screenshot-2.png)
+![Installed JDKs with version details, the current default, and toolchain actions](Screenshot-1.png)
 
-![Browse SDKs screen](Screenshot-3.png)
+![Installed SDKs in card view with their default versions](Screenshot-2.png)
+
+![Browse SDKs with live catalog results, search, filters, and favorites](Screenshot-3.png)
 
 ---
 

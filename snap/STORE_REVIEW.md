@@ -5,6 +5,10 @@ user's existing SDKMAN installation, executes SDKMAN's shell functions and
 installed toolchains, and can launch an activated host terminal. Strict
 confinement cannot provide those host-development-environment semantics.
 
+Listing copy, project/support links, the Development category, and reviewed
+screenshots are maintained in [`STORE_LISTING.md`](STORE_LISTING.md). Save and
+verify that listing separately from uploading or releasing a snap revision.
+
 Before the release workflow can publish:
 
 1. The publisher has registered the `zephyr` name.
@@ -32,7 +36,7 @@ Before the release workflow can publish:
 6. Publish the already-built, checksum-verified release snaps:
 
    ```shell
-   gh workflow run publish-snap-store.yml -f release_tag=v1.2.1
+   gh workflow run publish-snap-store.yml -f release_tag=v1.2.2
    ```
 
 Tag releases call this publisher automatically after the complete GitHub
