@@ -12,11 +12,14 @@ permissions:
 jobs:
   verify:
     name: Build and test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Lint workflow definitions
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
       - name: Set up JDK 21
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
@@ -27,8 +30,26 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
-      - name: Install native packaging tools
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends fakeroot rpm
+      - name: Validate packaging contracts
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends python3-yaml
+          python3 packaging/release.py source
+          python3 -m unittest discover -s packaging -p 'test_*.py' -v
+          python3 -m unittest discover -s packaging/flatpak -p 'test_*.py' -v
+          /usr/bin/python3 -m unittest discover -s packaging/snap -p 'test_*.py' -v
+
+      - name: Install package inspection tools
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends squashfs-tools appstream
 
       - name: Verify
-        run: ./gradlew check :desktopApp:packageAppImage :desktopApp:packageDeb :desktopApp:packageRpm --console=plain
+        run: ./gradlew check :desktopApp:createDistributable --console=plain
+
+      - name: Build and inspect native AppImage
+        env:
+          ZEPHYR_SKIP_GRADLE_BUILD: "1"
+        run: |
+          packaging/appimage/build-appimage.sh
+          version=$(python3 packaging/release.py source)
+          python3 packaging/release.py artifact "dist/Zephyr-$version-linux-amd64.AppImage" \
+            --version "$version" --arch amd64 --format AppImage

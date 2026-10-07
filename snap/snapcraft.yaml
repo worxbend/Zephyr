@@ -1,4 +1,8 @@
-name: zephyr-sdkman
+# Prerequisite: build :desktopApp:createDistributable with native Corretto 21.
+# packaging/snap/build-snap.sh isolates this prebuilt image in a core24 builder.
+# Direct `snapcraft pack --use-lxd` also needs that image present beforehand.
+# No JDK is installed here: Gradle's daemon requires AMAZON, not Ubuntu OpenJDK.
+name: zephyr
 title: Zephyr
 summary: Manage SDKMAN toolchains from the desktop
 description: |
@@ -8,7 +12,7 @@ description: |
 
   This snap uses classic confinement because Zephyr operates on the user's
   existing SDKMAN installation and launches host toolchains and terminals.
-version: "1.1.0"
+adopt-info: zephyr
 license: MIT
 website: https://github.com/w0rxbend/Zephyr
 source-code: https://github.com/w0rxbend/Zephyr
@@ -33,43 +37,73 @@ apps:
     command: usr/lib/zephyr/bin/com.worxbend.zephyr
     desktop: usr/share/applications/com.worxbend.zephyr.desktop
     common-id: com.worxbend.zephyr
+    environment:
+      FONTCONFIG_PATH: $SNAP/etc/fonts
+      FONTCONFIG_FILE: $SNAP/etc/fonts/fonts.conf
+      LIBGL_DRIVERS_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/dri
 
 parts:
   zephyr:
-    plugin: nil
-    source: .
+    plugin: dump
+    source: desktopApp/build/compose/binaries/main/app/com.worxbend.zephyr
+    source-type: local
+    organize:
+      bin: usr/lib/zephyr/bin
+      lib: usr/lib/zephyr/lib
     build-attributes:
       - enable-patchelf
-    build-packages:
-      - openjdk-21-jdk-headless
+    override-pull: |
+      craftctl default
+      version=$(sed -n 's/^zephyrVersion=//p' "$CRAFT_PROJECT_DIR/gradle.properties")
+      test -n "$version"
+      craftctl set version="$version"
+
+  runtime-dependencies:
+    plugin: nil
+    build-attributes:
+      - enable-patchelf
+    # Snapcraft resolves and records the transitive Ubuntu 24.04 dependencies.
+    # Do not replace this with copying host libraries or an unchecked squashfs.
     stage-packages:
       - libasound2t64
       - libfontconfig1
       - libfreetype6
       - libgl1
+      - libegl1
+      - libglx-mesa0
+      - libgl1-mesa-dri
+      # LLVM uses RUNPATH (not inherited by libedit's dependencies). Stage and
+      # patch libedit too, otherwise it can load incompatible host libraries.
+      - libedit2
       - libx11-6
       - libxext6
       - libxi6
       - libxrender1
       - libxtst6
+      - fonts-dejavu-core
     override-build: |
-      version=$(sed -n 's/^zephyrVersion=//p' "$CRAFT_PART_SRC/gradle.properties")
-      cd "$CRAFT_PART_SRC"
-      ./gradlew -PzephyrVersion="$version" :desktopApp:createDistributable --console=plain
+      craftctl default
+      # Keep host/user fonts available under classic, but always supply a
+      # fallback from the snap even on minimal machines with no system fonts.
+      sed -i 's#<dir>/usr/share/fonts</dir>#<dir prefix="relative">../../usr/share/fonts</dir>\n\t<dir>/usr/share/fonts</dir>#' \
+        "$CRAFT_PART_INSTALL/etc/fonts/fonts.conf"
+
+  desktop-integration:
+    plugin: nil
+    source: packaging/linux
+    source-type: local
+    override-build: |
       install -d \
-        "$CRAFT_PART_INSTALL/usr/lib/zephyr" \
         "$CRAFT_PART_INSTALL/usr/share/applications" \
         "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps" \
         "$CRAFT_PART_INSTALL/usr/share/metainfo"
-      cp -a desktopApp/build/compose/binaries/main/app/com.worxbend.zephyr/. \
-        "$CRAFT_PART_INSTALL/usr/lib/zephyr/"
-      install -m 0644 packaging/linux/com.worxbend.zephyr.desktop \
+      install -m 0644 "$CRAFT_PART_SRC/com.worxbend.zephyr.desktop" \
         "$CRAFT_PART_INSTALL/usr/share/applications/com.worxbend.zephyr.desktop"
-      sed -i 's/^Exec=.*/Exec=zephyr-sdkman.zephyr/' \
+      sed -i 's/^Exec=.*/Exec=zephyr/' \
         "$CRAFT_PART_INSTALL/usr/share/applications/com.worxbend.zephyr.desktop"
       sed -i 's#^Icon=.*#Icon=${SNAP}/usr/share/icons/hicolor/scalable/apps/com.worxbend.zephyr.svg#' \
         "$CRAFT_PART_INSTALL/usr/share/applications/com.worxbend.zephyr.desktop"
-      install -m 0644 packaging/linux/com.worxbend.zephyr.svg \
+      install -m 0644 "$CRAFT_PART_SRC/com.worxbend.zephyr.svg" \
         "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/com.worxbend.zephyr.svg"
-      install -m 0644 packaging/linux/com.worxbend.zephyr.metainfo.xml \
+      install -m 0644 "$CRAFT_PART_SRC/com.worxbend.zephyr.metainfo.xml" \
         "$CRAFT_PART_INSTALL/usr/share/metainfo/com.worxbend.zephyr.metainfo.xml"

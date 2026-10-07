@@ -1,4 +1,5 @@
 id: com.worxbend.zephyr
+default-branch: master
 runtime: org.freedesktop.Platform
 runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
@@ -9,6 +10,8 @@ finish-args:
   - --socket=fallback-x11
   - --socket=wayland
   - --device=dri
+  # SDKMAN data lives in the user's home. Keep the host-spawn permission, but
+  # permission alone does not make the current JVM backend execute on the host.
   - --filesystem=home
   - --talk-name=org.freedesktop.Flatpak
   - --talk-name=org.freedesktop.Notifications
@@ -16,6 +19,11 @@ finish-args:
 modules:
   - name: zephyr
     buildsystem: simple
+    # This release bundle repackages the native Compose image, not a Flathub
+    # source build. Preserve the supplied JVM/native binaries unchanged.
+    build-options:
+      strip: false
+      no-debuginfo: true
     build-commands:
       - install -d /app/lib/zephyr /app/bin /app/share/applications /app/share/icons/hicolor/512x512/apps /app/share/metainfo
       - cp -a app/. /app/lib/zephyr/

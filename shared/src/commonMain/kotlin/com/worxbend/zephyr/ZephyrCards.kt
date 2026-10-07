@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,7 +43,7 @@ internal fun ZephyrRecordLayout(
 ) {
     val fontScale = zephyrContentScale()
     BoxWithConstraints(modifier) {
-        val actionWidth = maxWidth * 0.55f
+        val actionWidth = maxWidth * 0.45f
         if (maxWidth < 760.dp * fontScale) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 content()
@@ -138,18 +139,21 @@ internal fun CandidateTable(
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(candidate.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                     Text(candidate.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        "${candidate.installedVersions.count { it.isInstalled }} installed",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        candidate.defaultVersion?.let { Badge("Default: $it", BadgeTone.Primary) }
+                                        if (candidate.hasLocalOnlyVersions) {
+                                            Badge("${candidate.localOnlyVersionCount} local-only", BadgeTone.Warning)
+                                        }
+                                    }
                                 }
                             }
                         },
                     ) {
-                        Text(
-                            "${candidate.installedVersions.count { it.isInstalled }} installed",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        candidate.defaultVersion?.let { Badge("Default: $it", BadgeTone.Primary) }
-                        if (candidate.hasLocalOnlyVersions) {
-                            Badge("${candidate.localOnlyVersionCount} local-only", BadgeTone.Warning)
-                        }
                         CopyTextButton(candidate.name, "Copy key")
                         if (cleanable.isNotEmpty()) {
                             OutlinedButton(onClick = { onClean(candidate.name, cleanable) }) {
@@ -194,15 +198,17 @@ internal fun PackageTable(
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(item.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                                     Text(item.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        item.stableVersion?.let { Badge("Stable: $it", BadgeTone.Success) }
+                                        if (item.isInstalled) Badge("Installed", BadgeTone.Primary)
+                                        if (favorite) Badge("Favorite", BadgeTone.Primary)
+                                    }
                                 }
                             }
                         },
                     ) {
-                        item.stableVersion?.let { Badge("Stable: $it", BadgeTone.Success) }
-                        if (item.isInstalled) Badge("Installed", BadgeTone.Primary)
-                        if (favorite) Badge("Favorite", BadgeTone.Primary)
                         CopyTextButton(item.name, "Copy key")
-                        OutlinedButton(onClick = { onFavoriteChange(item.name, !favorite) }) {
+                        TextButton(onClick = { onFavoriteChange(item.name, !favorite) }) {
                             Text(if (favorite) "★" else "☆")
                         }
                     }
@@ -332,7 +338,7 @@ internal fun PackageCard(
                 ) {
                     CopyTextButton(item.name, "Copy key")
                     if (onToggleFavorite != null) {
-                        OutlinedButton(onClick = onToggleFavorite, modifier = Modifier.heightIn(min = metrics.controlHeight)) {
+                        TextButton(onClick = onToggleFavorite, modifier = Modifier.heightIn(min = metrics.controlHeight)) {
                             Text(if (isFavorite) "★ Favorited" else "☆ Favorite")
                         }
                     }
@@ -373,9 +379,9 @@ internal fun JdkVersionCard(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                         CandidateIcon(CandidateKind.Jdk)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("JDK ${version.featureVersion}", fontWeight = FontWeight.SemiBold)
+                            Text("JDK ${version.featureVersion}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                             Text(version.identifier, style = MaterialTheme.typography.bodyMedium)
-                            Text(version.providerName ?: javaProviderName(version.providerCode) ?: "Provider unknown", style = MaterialTheme.typography.bodySmall)
+                            Text(version.providerName ?: javaProviderName(version.providerCode) ?: "Provider unknown", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Badge("SDKMAN key: java")
                                 if (version.identifier == default) Badge("Default", BadgeTone.Primary)
@@ -391,9 +397,9 @@ internal fun JdkVersionCard(
             ) {
                 CopyTextButton(version.identifier, "Copy version")
                 if (onOpenTerminal != null) {
-                    OutlinedButton(onClick = onOpenTerminal) { Text("Terminal") }
+                    TextButton(onClick = onOpenTerminal) { Text("Terminal") }
                 }
-                OutlinedButton(onClick = onToggleProtected) { Text(if (isProtected) "Unpin" else "Protect") }
+                TextButton(onClick = onToggleProtected) { Text(if (isProtected) "Unpin" else "Protect") }
                 if (version.isConfirmedLocalOnly && version.identifier != default && !isProtected) {
                     OutlinedButton(onClick = onClean) { Text("Clean") }
                 }

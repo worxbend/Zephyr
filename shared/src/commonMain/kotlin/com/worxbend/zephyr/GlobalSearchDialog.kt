@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -122,7 +124,7 @@ internal fun GlobalSearchDialog(
                 },
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             shadowElevation = 12.dp,
         ) {
             Column(
@@ -158,20 +160,23 @@ internal fun GlobalSearchDialog(
                     if (query.isBlank()) {
                         if (mode == SearchOverlayMode.CommandPalette) "Available commands" else "Quick access"
                     } else {
-                        "${results.size} result(s)"
+                        if (results.size == 1) "1 result" else "${results.size} results"
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentPadding = PaddingValues(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (results.isEmpty()) {
                         item {
                             Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 Text("No matching destination", fontWeight = FontWeight.SemiBold)
@@ -199,7 +204,7 @@ internal fun GlobalSearchDialog(
                         )
                     }
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
                 Text(
                     if (mode == SearchOverlayMode.CommandPalette) {
                         "↑↓ Move  •  Enter Run  •  Esc Close"
@@ -221,7 +226,7 @@ private fun GlobalSearchResultRow(
     onFocus: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -229,13 +234,13 @@ private fun GlobalSearchResultRow(
             .background(background)
             .border(
                 1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else background,
+                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 MaterialTheme.shapes.medium,
             )
             .onFocusChanged { if (it.isFocused) onFocus() }
             .semantics { this.selected = selected }
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

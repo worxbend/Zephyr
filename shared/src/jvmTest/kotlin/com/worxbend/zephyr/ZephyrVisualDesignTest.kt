@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -87,6 +88,12 @@ class ZephyrVisualDesignTest {
             Triple("dark", ZephyrDarkColors, ZephyrDarkFeedback),
         ).forEach { (theme, material, feedback) ->
             listOf(
+                Triple("suggested action", material.onPrimary, material.primary),
+                Triple("pressed action", material.onPrimaryContainer, material.primaryContainer),
+                Triple("body on background", material.onSurface, material.background),
+                Triple("subtitle on card", material.onSurfaceVariant, material.surfaceContainerLow),
+                Triple("selection outline on fill", material.primary, material.primaryContainer),
+                Triple("selection outline on surface", material.primary, material.surface),
                 Triple("success container", feedback.onSuccess, feedback.successContainer),
                 Triple("warning container", feedback.onWarning, feedback.warningContainer),
                 Triple("info container", feedback.onInfo, feedback.infoContainer),
@@ -203,6 +210,76 @@ class ZephyrVisualDesignTest {
         runOnIdle {
             assertEquals(1, firstClicks, "Space must activate the keyboard-focused toolbar button")
             assertEquals(0, disabledClicks)
+        }
+    }
+
+    @Test
+    fun symbolicHeaderActionsAreLabelledKeyboardOperableAndRespectDisabledState() = runDesktopComposeUiTest {
+        var clicks = 0
+        var disabledClicks = 0
+        setContent {
+            ZephyrTheme(darkTheme = false, reducedMotion = true) {
+                Column {
+                    ZephyrHeaderButton("Search", ZephyrIcon.Search, { clicks++ }, Modifier.testTag("header-search"))
+                    ZephyrHeaderButton("Disabled", ZephyrIcon.Refresh, { disabledClicks++ }, Modifier.testTag("header-disabled"), enabled = false)
+                    ZephyrHeaderButton("Activity", ZephyrIcon.Activity, {}, Modifier.testTag("header-activity"), badge = "3")
+                }
+            }
+        }
+        val search = onNodeWithTag("header-search")
+        val disabled = onNodeWithTag("header-disabled")
+        val activity = onNodeWithTag("header-activity")
+        search.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Search")))
+        activity.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Activity, 3 unread")))
+        disabled.assertIsNotEnabled().performClick()
+        search.requestFocus().assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        search.performKeyInput { pressKey(Key.Tab) }
+        activity.assertIsFocused()
+        activity.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
+        search.assertIsFocused().performKeyInput { pressKey(Key.Spacebar) }
+        runOnIdle {
+            assertEquals(2, clicks)
+            assertEquals(0, disabledClicks)
+        }
+    }
+
+    @Test
+    fun longDesktopPagesRemainScrollableAtLargeTextSizes() = runDesktopComposeUiTest(width = 800, height = 600) {
+        setContent {
+            ZephyrTheme(darkTheme = true, textScale = TextScale.Percent200, reducedMotion = true) {
+                ZephyrScrollPane(Modifier.fillMaxSize()) {
+                    repeat(20) { index ->
+                        ZephyrToolbarButton("TEST row $index", {}, suggested = index == 19)
+                    }
+                }
+            }
+        }
+        onNodeWithText("TEST row 19").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithText("TEST row 0").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun renderedScrollbarThumbHasNonTextContrastInBothThemes() {
+        listOf(false, true).forEach { dark ->
+            runDesktopComposeUiTest(width = 320, height = 240) {
+                val colors = if (dark) ZephyrDarkColors else ZephyrLightColors
+                setContent {
+                    ZephyrTheme(darkTheme = dark, reducedMotion = true) {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            ZephyrScrollPane(Modifier.fillMaxSize().testTag("scroll-contrast")) {
+                                repeat(20) { Text("TEST row $it") }
+                            }
+                        }
+                    }
+                }
+                val pixels = onNodeWithTag("scroll-contrast").captureToImage().toPixelMap()
+                val thumb = pixels[pixels.width - 4, 20]
+                val track = pixels[pixels.width - 4, pixels.height - 20]
+                assertEquals(colors.onSurfaceVariant, thumb, "Sample must be inside the opaque idle thumb")
+                val contrast = (maxOf(thumb.luminance(), track.luminance()) + 0.05f) /
+                    (minOf(thumb.luminance(), track.luminance()) + 0.05f)
+                assertTrue(contrast >= 3f, "Scrollbar contrast is $contrast in ${themeName(dark)} mode")
+            }
         }
     }
 

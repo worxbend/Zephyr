@@ -1,12 +1,12 @@
-# Classic confinement request: zephyr-sdkman
+# Classic confinement request: zephyr
 
 Use the text below to open a topic in the Snapcraft forum's
 [`store-requests` / `classic-confinement` category][forum-category] after the
-`zephyr-sdkman` name is registered.
+`zephyr` name is registered.
 
 ---
 
-- **name:** `zephyr-sdkman`
+- **name:** `zephyr`
 - **description:** Zephyr is a desktop interface for SDKMAN. It inventories
   installed JDKs and SDKs, previews and performs SDKMAN transactions, manages
   project `.sdkmanrc` environments, and launches terminals with selected host

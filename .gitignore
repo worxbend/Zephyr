@@ -19,3 +19,4 @@ captures
 node_modules/
 dist/
 .flatpak-builder/
+/packaging/**/__pycache__/

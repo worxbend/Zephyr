@@ -895,18 +895,13 @@ private fun StorageVersionRow(
     onReviewCleanup: () -> Unit,
 ) {
     ZephyrPanel(Modifier.fillMaxWidth()) {
-        Column(
+        ZephyrRecordLayout(
             modifier = Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            content = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "${entry.candidateDisplayName} ${entry.version}",
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
@@ -917,27 +912,28 @@ private fun StorageVersionRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-                entry.bytes?.let { Badge(formatByteSize(it), BadgeTone.Primary) }
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Badge(
-                    entry.cleanupDisposition.label,
-                    when (entry.cleanupDisposition) {
-                        StorageCleanupDisposition.VerifiedLocalOnly -> BadgeTone.Warning
-                        StorageCleanupDisposition.OptionalNonDefault -> BadgeTone.Neutral
-                        StorageCleanupDisposition.BlockedDefault -> BadgeTone.Primary
-                        StorageCleanupDisposition.BlockedProtected -> BadgeTone.Success
-                    },
-                )
-                Badge(entry.remoteAvailability.label)
-                if (entry.cleanupDisposition.eligible) {
-                    OutlinedButton(onClick = onReviewCleanup) {
-                        Text("Review cleanup")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        entry.bytes?.let { Badge(formatByteSize(it), BadgeTone.Primary) }
+                        Badge(
+                            entry.cleanupDisposition.label,
+                            when (entry.cleanupDisposition) {
+                                StorageCleanupDisposition.VerifiedLocalOnly -> BadgeTone.Warning
+                                StorageCleanupDisposition.OptionalNonDefault -> BadgeTone.Neutral
+                                StorageCleanupDisposition.BlockedDefault -> BadgeTone.Primary
+                                StorageCleanupDisposition.BlockedProtected -> BadgeTone.Success
+                            },
+                        )
+                        Badge(entry.remoteAvailability.label)
                     }
+                }
+            },
+        ) {
+            if (entry.cleanupDisposition.eligible) {
+                OutlinedButton(onClick = onReviewCleanup) {
+                    Text("Review cleanup")
                 }
             }
         }
@@ -1366,7 +1362,7 @@ private fun VersionRow(
             ) {
                 CopyTextButton(version.version, "Copy version")
                 if (version.isInstalled) {
-                    OutlinedButton(
+                    TextButton(
                         onClick = openTerminal,
                         enabled = !sdkmanHome.isNullOrBlank(),
                         modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight),
@@ -1383,20 +1379,15 @@ private fun VersionRow(
                     }
                 }
                 if (version.isInstalled && !version.isDefault) {
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { viewModel.requestTransaction(SdkmanTransaction.SetDefault(candidateName, version.version)) },
                         modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight),
                     ) {
                         Text("Make default")
                     }
-                    if (!version.isConfirmedLocalOnly && !isProtected) {
-                        OutlinedButton(onClick = { onUninstall(candidateName, version.version) }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) {
-                            Text("Uninstall")
-                        }
-                    }
                 }
                 if (version.isInstalled) {
-                    OutlinedButton(
+                    TextButton(
                         onClick = { viewModel.setVersionProtected(candidateName, version.version, !isProtected) },
                         modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight),
                     ) {
@@ -1417,6 +1408,11 @@ private fun VersionRow(
                                 )
                             }
                         }
+                    }
+                }
+                if (version.isInstalled && !version.isDefault && !version.isConfirmedLocalOnly && !isProtected) {
+                    OutlinedButton(onClick = { onUninstall(candidateName, version.version) }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) {
+                        Text("Uninstall")
                     }
                 }
                 if (version.isInstalled && version.isConfirmedLocalOnly && !version.isDefault && !isProtected) {

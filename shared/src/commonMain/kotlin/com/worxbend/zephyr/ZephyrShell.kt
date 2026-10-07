@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,8 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -61,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
 import com.worxbend.zephyr.domain.CandidateKind
 import com.worxbend.zephyr.domain.ActivityAction
 import com.worxbend.zephyr.domain.ActivitySeverity
@@ -87,9 +86,6 @@ import kotlin.math.roundToInt
 import com.worxbend.zephyr.viewmodel.ZephyrRoute
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import com.worxbend.zephyr.viewmodel.ZephyrViewModel
-import org.jetbrains.compose.resources.painterResource
-import zephyr.shared.generated.resources.Res
-import zephyr.shared.generated.resources.ic_arrow_left
 
 private fun zephyrActionHandler(viewModel: ZephyrViewModel): ZephyrActionHandler =
     ZephyrActionHandler { request ->
@@ -494,78 +490,130 @@ private fun WorkbenchToolbar(
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compactHeader = maxWidth < 600.dp * zephyrContentScale()
         Surface(
-            modifier = Modifier.fillMaxWidth().height(metrics.toolbarHeight),
+            modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shadowElevation = 0.dp,
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = if (compactHeader) 6.dp else metrics.panelPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (compactHeader) 4.dp else metrics.spacing),
-            ) {
-                if (layout == ShellLayout.Narrow) {
-                    ZephyrToolbarButton("Menu", onClick = onToggleNavigation)
-                }
-                if (state.previousRoute != null) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(metrics.controlHeight)) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_arrow_left),
-                            contentDescription = "Back",
-                            modifier = Modifier.size(18.dp),
+            CenteredHeader(
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(min = metrics.toolbarHeight)
+                    .padding(horizontal = if (compactHeader) 6.dp else metrics.panelPadding, vertical = 4.dp),
+                start = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (layout == ShellLayout.Narrow) {
+                            ZephyrHeaderButton("Open navigation", ZephyrIcon.Menu, onClick = onToggleNavigation)
+                        }
+                        if (state.previousRoute != null) {
+                            ZephyrHeaderButton("Back", ZephyrIcon.Back, onClick = onBack)
+                        }
+                    }
+                },
+                end = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ZephyrHeaderButton("Search / commands (Ctrl/⌘ K)", ZephyrIcon.Search, onClick = onOpenSearch)
+                        val unreadActivity = state.activityEvents.count { !it.acknowledged }
+                        if (!compactHeader) {
+                            ZephyrHeaderButton(
+                                label = "Activity",
+                                icon = ZephyrIcon.Activity,
+                                badge = unreadActivity.takeIf { it > 0 }?.toString(),
+                                onClick = onToggleActivity,
+                            )
+                        }
+                        ToolbarOverflow(
+                            showActivity = compactHeader,
+                            onToggleActivity = onToggleActivity,
+                            darkTheme = darkTheme,
+                            networkLabel = state.connectivityStatus.state.label,
+                            metadataLabel = metadataShortLabel(state.sdkmanStatus.metadataStatus),
+                            updateLabel = selfUpdateShortLabel(state.sdkmanStatus.selfUpdateStatus),
+                            busy = busy,
+                            connectivityChecking = state.connectivityStatus.state == ConnectivityState.Checking,
+                            onToggleTheme = onToggleTheme,
+                            onRefresh = onRefresh,
+                            onRefreshConnectivity = onRefreshConnectivity,
+                            onRefreshMetadata = onRefreshMetadata,
+                            onScan = onScan,
+                            onCheckUpdates = onCheckUpdates,
                         )
                     }
-                }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        headerTitle(state),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!compactHeader) {
+                },
+                title = {
+                    Column(Modifier.padding(horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            if (showSdkmanHome) state.sdkmanStatus.home.orEmpty() else sdkmanVersionLabel(state),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            headerTitle(state),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = TextOverflow.MiddleEllipsis,
+                            overflow = TextOverflow.Ellipsis,
                         )
+                        if (!compactHeader) {
+                            Text(
+                                if (showSdkmanHome) state.sdkmanStatus.home.orEmpty() else sdkmanVersionLabel(state),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.MiddleEllipsis,
+                            )
+                        }
                     }
-                }
-                if (layout == ShellLayout.Wide) {
-                    GlobalSearchButton(onClick = onOpenSearch)
-                } else {
-                    ZephyrToolbarButton("Find", onClick = onOpenSearch)
-                }
-                val unreadActivity = state.activityEvents.count { !it.acknowledged }
-                if (!compactHeader) {
-                    ZephyrToolbarButton(
-                        label = "Activity",
-                        detail = unreadActivity.takeIf { it > 0 }?.toString(),
-                        onClick = onToggleActivity,
-                    )
-                }
-                ToolbarOverflow(
-                    showActivity = compactHeader,
-                    onToggleActivity = onToggleActivity,
-                    darkTheme = darkTheme,
-                    networkLabel = state.connectivityStatus.state.label,
-                    metadataLabel = metadataShortLabel(state.sdkmanStatus.metadataStatus),
-                    updateLabel = selfUpdateShortLabel(state.sdkmanStatus.selfUpdateStatus),
-                    busy = busy,
-                    connectivityChecking = state.connectivityStatus.state == ConnectivityState.Checking,
-                    onToggleTheme = onToggleTheme,
-                    onRefresh = onRefresh,
-                    onRefreshConnectivity = onRefreshConnectivity,
-                    onRefreshMetadata = onRefreshMetadata,
-                    onScan = onScan,
-                    onCheckUpdates = onCheckUpdates,
+                },
+            )
+        }
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+}
+
+@Composable
+private fun CenteredHeader(
+    modifier: Modifier = Modifier,
+    start: @Composable () -> Unit,
+    end: @Composable () -> Unit,
+    title: @Composable () -> Unit,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            Box { start() }
+            Box { end() }
+            Box { title() }
+        },
+    ) { measurables, constraints ->
+        val looseConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val startPlaceable = measurables[0].measure(looseConstraints)
+        val endPlaceable = measurables[1].measure(looseConstraints)
+        // Reserve equal wings so asymmetric actions never shift the window title.
+        val wingWidth = maxOf(startPlaceable.width, endPlaceable.width)
+        val titleWidth = (constraints.maxWidth - wingWidth * 2).coerceAtLeast(0)
+        val stackedTitle = titleWidth < 120.dp.roundToPx()
+        val stackedActions = startPlaceable.width + endPlaceable.width > constraints.maxWidth
+        val titlePlaceable = measurables[2].measure(
+            looseConstraints.copy(maxWidth = if (stackedTitle) constraints.maxWidth else titleWidth),
+        )
+        val actionHeight = if (stackedActions) startPlaceable.height + endPlaceable.height
+            else maxOf(startPlaceable.height, endPlaceable.height)
+        val titleGap = if (stackedTitle) 4.dp.roundToPx() else 0
+        val height = constraints.constrainHeight(
+            if (stackedTitle) titlePlaceable.height + titleGap + actionHeight
+            else maxOf(actionHeight, titlePlaceable.height),
+        )
+        layout(constraints.maxWidth, height) {
+            if (stackedTitle) {
+                // Keep the title and all actions usable at narrow widths and large text sizes.
+                titlePlaceable.placeRelative((constraints.maxWidth - titlePlaceable.width) / 2, 0)
+                val actionTop = titlePlaceable.height + titleGap
+                startPlaceable.placeRelative(0, actionTop)
+                endPlaceable.placeRelative(
+                    constraints.maxWidth - endPlaceable.width,
+                    actionTop + if (stackedActions) startPlaceable.height else 0,
                 )
+            } else {
+                startPlaceable.placeRelative(0, (height - startPlaceable.height) / 2)
+                endPlaceable.placeRelative(constraints.maxWidth - endPlaceable.width, (height - endPlaceable.height) / 2)
+                titlePlaceable.placeRelative((constraints.maxWidth - titlePlaceable.width) / 2, (height - titlePlaceable.height) / 2)
             }
         }
     }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
 }
 
 @Composable
@@ -591,7 +639,7 @@ private fun ToolbarOverflow(
         action()
     }
     Box {
-        ZephyrToolbarButton("More", onClick = { expanded = true })
+        ZephyrHeaderButton("More actions", ZephyrIcon.More, onClick = { expanded = true })
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (showActivity) {
                 DropdownMenuItem(
@@ -741,34 +789,6 @@ private fun ActivityCenterPanel(
 }
 
 @Composable
-private fun GlobalSearchButton(onClick: () -> Unit) {
-    val metrics = LocalZephyrMetrics.current
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.width(250.dp).height(metrics.controlHeight),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                "Search / commands",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            ZephyrKeycap("Ctrl/⌘ K")
-        }
-    }
-}
-
-@Composable
 private fun WorkbenchSidebar(
     state: ZephyrUiState.Ready,
     width: Dp,
@@ -792,7 +812,18 @@ private fun WorkbenchSidebar(
             .padding(horizontal = metrics.spacing, vertical = metrics.panelPadding),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        ZephyrSectionLabel("Tasks")
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text("Zephyr", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "SDKMAN toolchains",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        ZephyrSectionLabel("Workspace")
         ZephyrNavigationItem(
             "O",
             "Overview",
@@ -883,7 +914,8 @@ private fun WorkbenchSidebar(
             NavigationChild("D", "Diagnostics", state.route is ZephyrRoute.Diagnostics, ZephyrRoute.Diagnostics, onNavigate)
             NavigationChild("T", "Task Center", state.route is ZephyrRoute.History, ZephyrRoute.History, onNavigate)
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+        Spacer(Modifier.height(8.dp))
+        ZephyrSectionLabel("Application")
         ZephyrNavigationItem("⚙", "Settings", state.route is ZephyrRoute.Settings, { onNavigate(ZephyrRoute.Settings) })
         ZephyrNavigationItem("i", "About", state.route is ZephyrRoute.About, { onNavigate(ZephyrRoute.About) })
     }
@@ -973,34 +1005,26 @@ private fun WorkbenchStatusBar(
     val metrics = LocalZephyrMetrics.current
     val busyLabel = state.busyLabel()
     Surface(
-        modifier = Modifier.fillMaxWidth().height(metrics.statusBarHeight),
+        modifier = Modifier.fillMaxWidth().heightIn(min = metrics.statusBarHeight),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(horizontal = metrics.spacing),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = metrics.panelPadding, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Surface(
-                color = if (busyLabel == null) LocalZephyrColors.current.successContainer else MaterialTheme.colorScheme.primaryContainer,
-                contentColor = if (busyLabel == null) LocalZephyrColors.current.onSuccess else MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = MaterialTheme.shapes.extraSmall,
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(if (busyLabel == null) "✓" else "↻", style = MaterialTheme.typography.labelSmall)
-                    Text(busyLabel ?: "Ready", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                }
-            }
+            Text(
+                busyLabel ?: "Ready",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (busyLabel == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+            )
             state.localOnlyScanProgress?.let { progress ->
                 val summary = "${progress.completed}/${progress.total} audited, " +
                     "${progress.trustedFindings.sumOf { it.localOnlyVersionCount }} findings, " +
                     "${progress.failures.size} failures"
-                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
                 Text(
                     summary,
                     modifier = Modifier.semantics {
@@ -1025,7 +1049,7 @@ private fun WorkbenchStatusBar(
                     }
                 }
             }
-            Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
             StatusDot(
                 when (state.connectivityStatus.state) {
                     ConnectivityState.Online -> StatusTone.Success
@@ -1040,20 +1064,20 @@ private fun WorkbenchStatusBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (!compact) {
-                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
                 Text(
                     "${state.candidates.size} candidates",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
                 Text(
                     jdkSubtitle(state),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (metadataRefreshSchedule != MetadataRefreshSchedule.Off) {
-                    Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         "Auto refresh: ${metadataRefreshSchedule.label}",
                         style = MaterialTheme.typography.labelSmall,
@@ -1061,7 +1085,7 @@ private fun WorkbenchStatusBar(
                     )
                 }
                 state.catalogCachedAtEpochMillis?.takeIf { state.catalogIsCached }?.let { cachedAt ->
-                    Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         "Cached catalog: ${candidateCacheAgeLabel(cachedAt, currentEpochMillis())}",
                         style = MaterialTheme.typography.labelSmall,
@@ -1070,7 +1094,7 @@ private fun WorkbenchStatusBar(
                 }
             }
             state.readRetryStatus?.let { retry ->
-                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
                 Text(
                     "Retrying ${retry.operation.label} (${retry.nextAttempt}/${retry.maximumAttempts})",
                     style = MaterialTheme.typography.labelSmall,
@@ -1087,7 +1111,7 @@ private fun WorkbenchStatusBar(
                     maxLines = 1,
                     overflow = TextOverflow.MiddleEllipsis,
                 )
-                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
             }
             if (!compact) {
                 Text(

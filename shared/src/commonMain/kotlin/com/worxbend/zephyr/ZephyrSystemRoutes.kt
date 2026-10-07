@@ -3,6 +3,7 @@ package com.worxbend.zephyr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -98,220 +101,250 @@ internal fun OverviewScreen(
     val desiredState = settings.desiredToolchainState
     val desiredDrift = desiredState?.let { calculateDesiredStateDrift(it, state.candidates) }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 960.dp * zephyrContentScale()
-        val metricWidth = if (wide) (maxWidth - metrics.spacing * 2) / 3 else maxWidth
-        val primaryWidth = if (wide) (maxWidth - metrics.spacing) * 0.6f else maxWidth
-        val secondaryWidth = if (wide) (maxWidth - metrics.spacing) * 0.4f else maxWidth
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(metrics.spacing * 2),
-        ) {
-            PageTitle("Overview", "Your SDKMAN toolchain at a glance.")
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(metrics.spacing),
-                verticalArrangement = Arrangement.spacedBy(metrics.spacing),
-            ) {
+    ZephyrScrollPane(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        PageTitle("Overview", "Your SDKMAN toolchain at a glance.")
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val tiles: @Composable (Modifier) -> Unit = { tileModifier ->
                 ZephyrMetricTile(
                     label = "Default JDK",
                     value = jdk?.defaultVersion ?: "Not set",
                     detail = if (jdk == null) "Install a JDK to get started" else "${jdk.installedVersions.count { it.isInstalled }} installed",
                     tone = if (jdk?.defaultVersion != null) StatusTone.Success else StatusTone.Warning,
-                    modifier = Modifier.width(metricWidth),
+                    modifier = tileModifier,
                 )
                 ZephyrMetricTile(
                     label = "Installed SDKs",
                     value = sdks.toString(),
                     detail = "$installedVersions total versions",
                     tone = StatusTone.Accent,
-                    modifier = Modifier.width(metricWidth),
+                    modifier = tileModifier,
                 )
                 ZephyrMetricTile(
                     label = "Local-only",
                     value = localOnly.toString(),
                     detail = if (localOnly == 0) "No cleanup needed" else "Review before cleaning",
                     tone = if (localOnly == 0) StatusTone.Success else StatusTone.Warning,
-                    modifier = Modifier.width(metricWidth),
+                    modifier = tileModifier,
                 )
             }
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(metrics.spacing),
-                verticalArrangement = Arrangement.spacedBy(metrics.spacing),
-            ) {
-                ZephyrPanel(Modifier.width(primaryWidth)) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(metrics.panelPadding),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        PanelHeading("Quick actions", "Common SDKMAN workflows")
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ZephyrToolbarButton("Browse JDKs", onClick = { viewModel.navigate(ZephyrRoute.BrowseJdks) })
-                            ZephyrToolbarButton("Browse SDKs", onClick = { viewModel.navigate(ZephyrRoute.BrowseSdks) })
-                            ZephyrToolbarButton("Profiles", onClick = { viewModel.navigate(ZephyrRoute.Profiles) })
-                            ZephyrToolbarButton("Update Center", onClick = { viewModel.navigate(ZephyrRoute.UpdateCenter) })
-                            ZephyrToolbarButton("Batch Uninstall", onClick = { viewModel.navigate(ZephyrRoute.BatchUninstall) })
-                            ZephyrToolbarButton("Refresh local state", onClick = viewModel::refreshInstalled)
-                            ZephyrToolbarButton("Scan local-only", onClick = viewModel::scanLocalOnly)
-                        }
-                        PanelHeading("Desired state", "Continuous drift visibility; extra versions are report-only")
-                        if (desiredState == null || desiredDrift == null) {
-                            Text(
-                                "Choose a toolchain profile or environment snapshot as the desired baseline.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Row weights divide the actual pixel budget, including spacing. Independently
+            // rounded Dp widths in a FlowRow can overflow by one pixel and wrap tile three.
+            if (maxWidth >= 840.dp * zephyrContentScale()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(metrics.spacing)) {
+                    tiles(Modifier.weight(1f))
+                }
+            } else {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(metrics.spacing)) {
+                    tiles(Modifier.fillMaxWidth())
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            PanelHeading("Quick actions", "Common SDKMAN workflows")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZephyrToolbarButton("Browse JDKs", onClick = { viewModel.navigate(ZephyrRoute.BrowseJdks) }, suggested = true)
+                ZephyrToolbarButton("Browse SDKs", onClick = { viewModel.navigate(ZephyrRoute.BrowseSdks) })
+                ZephyrToolbarButton("Profiles", onClick = { viewModel.navigate(ZephyrRoute.Profiles) })
+                ZephyrToolbarButton("Update Center", onClick = { viewModel.navigate(ZephyrRoute.UpdateCenter) })
+            }
+        }
+        OverviewColumns(
+            primary = {
+                OverviewSection("Desired state", "Continuous drift visibility; extra versions are report-only") {
+                    if (desiredState == null || desiredDrift == null) {
+                        Text(
+                            "Choose a toolchain profile or environment snapshot as the desired baseline.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        ZephyrToolbarButton(
+                            "Choose in Profiles",
+                            onClick = { viewModel.navigate(ZephyrRoute.Profiles) },
+                        )
+                    } else {
+                        Text(
+                            "${desiredState.sourceKind.label}: ${desiredState.sourceLabel}",
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            Badge(
+                                if (desiredDrift.isAligned) "Aligned" else "Drift detected",
+                                if (desiredDrift.isAligned) BadgeTone.Success else BadgeTone.Warning,
                             )
-                            ZephyrToolbarButton(
-                                "Choose in Profiles",
-                                onClick = { viewModel.navigate(ZephyrRoute.Profiles) },
-                            )
-                        } else {
-                            Text(
-                                "${desiredState.sourceKind.label}: ${desiredState.sourceLabel}",
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                verticalArrangement = Arrangement.spacedBy(7.dp),
-                            ) {
-                                Badge(
-                                    if (desiredDrift.isAligned) "Aligned" else "Drift detected",
-                                    if (desiredDrift.isAligned) BadgeTone.Success else BadgeTone.Warning,
-                                )
-                                if (desiredDrift.missingVersions.isNotEmpty()) {
-                                    Badge("${desiredDrift.missingVersions.size} missing", BadgeTone.Warning)
-                                }
-                                if (desiredDrift.defaultChanges.isNotEmpty()) {
-                                    Badge("${desiredDrift.defaultChanges.size} defaults differ", BadgeTone.Primary)
-                                }
-                                if (desiredDrift.extraInstalledVersions.isNotEmpty()) {
-                                    Badge("${desiredDrift.extraInstalledVersions.size} extra (report only)")
-                                }
-                                if (desiredDrift.localOnlyDesiredVersions.isNotEmpty()) {
-                                    Badge("${desiredDrift.localOnlyDesiredVersions.size} desired local-only", BadgeTone.Warning)
-                                }
+                            if (desiredDrift.missingVersions.isNotEmpty()) {
+                                Badge("${desiredDrift.missingVersions.size} missing", BadgeTone.Warning)
                             }
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                if (desiredDrift.remediationCommands.isNotEmpty()) {
-                                    ZephyrToolbarButton(
-                                        "Review repair (${desiredDrift.remediationCommands.size})",
-                                        onClick = {
-                                            viewModel.requestTransaction(
-                                                SdkmanTransaction.ToolchainActivation(
-                                                    profileName = "Desired state · ${desiredState.sourceLabel}",
-                                                    commands = desiredDrift.remediationCommands,
-                                                ),
-                                            )
-                                        },
-                                    )
-                                }
+                            if (desiredDrift.defaultChanges.isNotEmpty()) {
+                                Badge("${desiredDrift.defaultChanges.size} defaults differ", BadgeTone.Primary)
+                            }
+                            if (desiredDrift.extraInstalledVersions.isNotEmpty()) {
+                                Badge("${desiredDrift.extraInstalledVersions.size} extra (report only)")
+                            }
+                            if (desiredDrift.localOnlyDesiredVersions.isNotEmpty()) {
+                                Badge("${desiredDrift.localOnlyDesiredVersions.size} desired local-only", BadgeTone.Warning)
+                            }
+                        }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (desiredDrift.remediationCommands.isNotEmpty()) {
                                 ZephyrToolbarButton(
-                                    "Clear desired state",
+                                    "Review repair (${desiredDrift.remediationCommands.size})",
                                     onClick = {
-                                        onSettingsChange { it.copy(desiredToolchainState = null) }
+                                        viewModel.requestTransaction(
+                                            SdkmanTransaction.ToolchainActivation(
+                                                profileName = "Desired state · ${desiredState.sourceLabel}",
+                                                commands = desiredDrift.remediationCommands,
+                                            ),
+                                        )
+                                    },
+                                )
+                            }
+                            ZephyrToolbarButton(
+                                "Clear desired state",
+                                onClick = {
+                                    onSettingsChange { it.copy(desiredToolchainState = null) }
+                                },
+                            )
+                        }
+                    }
+                }
+                OverviewSection("Toolchain summary", "Persisted SDKMAN defaults") {
+                    KeyValueRow("SDKMAN", sdkmanVersionLabel(state))
+                    KeyValueRow("Default JDK", jdk?.defaultVersion ?: "Not configured")
+                    KeyValueRow("Candidates", state.candidates.size.toString())
+                    KeyValueRow("Catalog", if (state.catalog.isEmpty()) "Not loaded" else "${state.catalog.size} packages")
+                }
+                OverviewSection("Recent items", "Last-viewed candidate details") {
+                    if (settings.recentCandidates.isEmpty()) {
+                        Text(
+                            "Candidate details you open will appear here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            settings.recentCandidates.forEach { candidate ->
+                                val installed = state.candidates.firstOrNull { it.name == candidate }
+                                val remote = state.catalog.firstOrNull { it.name == candidate }
+                                val label = installed?.displayName ?: remote?.displayName ?: displayNameFor(candidate)
+                                val kind = installed?.kind ?: remote?.kind
+                                ZephyrToolbarButton(
+                                    label = label,
+                                    onClick = {
+                                        viewModel.navigate(
+                                            if (candidate == "java" || kind == CandidateKind.Jdk) {
+                                                ZephyrRoute.JdkDetail(candidate)
+                                            } else {
+                                                ZephyrRoute.SdkDetail(candidate)
+                                            },
+                                        )
                                     },
                                 )
                             }
                         }
-                        PanelHeading("Toolchain summary", "Persisted SDKMAN defaults")
-                        KeyValueRow("SDKMAN", sdkmanVersionLabel(state))
-                        KeyValueRow("Default JDK", jdk?.defaultVersion ?: "Not configured")
-                        KeyValueRow("Candidates", state.candidates.size.toString())
-                        KeyValueRow("Catalog", if (state.catalog.isEmpty()) "Not loaded" else "${state.catalog.size} packages")
-                        PanelHeading("Recent items", "Last-viewed candidate details")
-                        if (settings.recentCandidates.isEmpty()) {
-                            Text(
-                                "Candidate details you open will appear here.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                settings.recentCandidates.forEach { candidate ->
-                                    val installed = state.candidates.firstOrNull { it.name == candidate }
-                                    val remote = state.catalog.firstOrNull { it.name == candidate }
-                                    val label = installed?.displayName ?: remote?.displayName ?: displayNameFor(candidate)
-                                    val kind = installed?.kind ?: remote?.kind
-                                    ZephyrToolbarButton(
-                                        label = label,
-                                        onClick = {
-                                            viewModel.navigate(
-                                                if (candidate == "java" || kind == CandidateKind.Jdk) {
-                                                    ZephyrRoute.JdkDetail(candidate)
-                                                } else {
-                                                    ZephyrRoute.SdkDetail(candidate)
-                                                },
-                                            )
-                                        },
-                                    )
-                                }
+                    }
+                }
+            },
+            secondary = {
+                OverviewSection("Environment health", "Read-only diagnostics") {
+                    HealthRow("SDKMAN detected", true)
+                    HealthRow("SDKMAN service online", state.connectivityStatus.state == ConnectivityState.Online)
+                    HealthRow("CLI version available", state.sdkmanStatus.cliVersion != null)
+                    HealthRow("Default JDK configured", jdk?.defaultVersion != null)
+                    HealthRow("No local-only versions", localOnly == 0)
+                    HealthRow(
+                        "SDKMAN integrity",
+                        state.integrityChecks.none { it.status == IntegrityStatus.Failed },
+                    )
+                    ZephyrToolbarButton(
+                        label = "Open diagnostics",
+                        onClick = { viewModel.navigate(ZephyrRoute.Diagnostics) },
+                    )
+                }
+                OverviewSection("Favorites", "Pinned SDKs and JDK vendors") {
+                    if (settings.favoriteCandidates.isEmpty() && settings.favoriteJdkVendors.isEmpty()) {
+                        Text(
+                            "Pin SDKs or JDK vendors from Browse to keep them close.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            settings.favoriteCandidates.sorted().forEach { candidate ->
+                                val label = state.catalog.firstOrNull { it.name == candidate }?.displayName
+                                    ?: state.candidates.firstOrNull { it.name == candidate }?.displayName
+                                    ?: displayNameFor(candidate)
+                                ZephyrToolbarButton(
+                                    label = "★ $label",
+                                    onClick = { viewModel.navigate(ZephyrRoute.SdkDetail(candidate)) },
+                                )
+                            }
+                            settings.favoriteJdkVendors.sorted().forEach { vendor ->
+                                ZephyrToolbarButton(
+                                    label = "★ ${javaProviderName(vendor) ?: vendor}",
+                                    onClick = { viewModel.navigate(ZephyrRoute.BrowseJdks) },
+                                )
                             }
                         }
                     }
                 }
-                ZephyrPanel(Modifier.width(secondaryWidth)) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(metrics.panelPadding),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        PanelHeading("Environment health", "Read-only diagnostics")
-                        HealthRow("SDKMAN detected", true)
-                        HealthRow("SDKMAN service online", state.connectivityStatus.state == ConnectivityState.Online)
-                        HealthRow("CLI version available", state.sdkmanStatus.cliVersion != null)
-                        HealthRow("Default JDK configured", jdk?.defaultVersion != null)
-                        HealthRow("No local-only versions", localOnly == 0)
-                        HealthRow(
-                            "SDKMAN integrity",
-                            state.integrityChecks.none { it.status == IntegrityStatus.Failed },
-                        )
-                        ZephyrToolbarButton(
-                            label = "Open diagnostics",
-                            onClick = { viewModel.navigate(ZephyrRoute.Diagnostics) },
-                        )
-                        PanelHeading("Favorites", "Pinned SDKs and JDK vendors")
-                        if (settings.favoriteCandidates.isEmpty() && settings.favoriteJdkVendors.isEmpty()) {
-                            Text(
-                                "Pin SDKs or JDK vendors from Browse to keep them close.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                settings.favoriteCandidates.sorted().forEach { candidate ->
-                                    val label = state.catalog.firstOrNull { it.name == candidate }?.displayName
-                                        ?: state.candidates.firstOrNull { it.name == candidate }?.displayName
-                                        ?: displayNameFor(candidate)
-                                    ZephyrToolbarButton(
-                                        label = "★ $label",
-                                        onClick = { viewModel.navigate(ZephyrRoute.SdkDetail(candidate)) },
-                                    )
-                                }
-                                settings.favoriteJdkVendors.sorted().forEach { vendor ->
-                                    ZephyrToolbarButton(
-                                        label = "★ ${javaProviderName(vendor) ?: vendor}",
-                                        onClick = { viewModel.navigate(ZephyrRoute.BrowseJdks) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+            },
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ZephyrToolbarButton("Refresh local state", onClick = viewModel::refreshInstalled)
+            ZephyrToolbarButton("Scan local-only", onClick = viewModel::scanLocalOnly)
+            TextButton(onClick = { viewModel.navigate(ZephyrRoute.BatchUninstall) }) { Text("Batch Uninstall") }
+        }
+    }
+}
+
+@Composable
+private fun OverviewColumns(
+    primary: @Composable () -> Unit,
+    secondary: @Composable () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 960.dp * zephyrContentScale()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Column(Modifier.weight(3f), verticalArrangement = Arrangement.spacedBy(24.dp)) { primary() }
+                Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(24.dp)) { secondary() }
             }
+        } else {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                primary()
+                secondary()
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewSection(
+    title: String,
+    subtitle: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    ZephyrPanel(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PanelHeading(title, subtitle)
+            content()
         }
     }
 }
@@ -2151,7 +2184,6 @@ internal fun SettingsScreen(
     settings: AppSettings,
     onSettingsChange: ((AppSettings) -> AppSettings) -> Unit,
 ) {
-    val metrics = LocalZephyrMetrics.current
     val proxyService = remember { createProxyConfigurationService() }
     val sdkmanHomeService = remember { createSdkmanHomeConfigurationService() }
     val portablePreferencesService = remember { createPortablePreferencesService() }
@@ -2168,361 +2200,352 @@ internal fun SettingsScreen(
         proxyPort = proxyConfiguration.port.toString()
         customSdkmanHome = sdkmanHomeService.configuredPath()
     }
-    Column(
+    ZephyrScrollPane(
         modifier = Modifier
             .fillMaxHeight()
-            .widthIn(max = 1040.dp)
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(metrics.spacing * 2),
+            .widthIn(max = 920.dp)
+            .fillMaxWidth(),
+        spacing = 28.dp,
     ) {
         PageTitle("Settings", "Personalize Zephyr. Changes are saved for this desktop user.")
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(metrics.panelPadding)) {
-                PanelHeading("Appearance", "Workbench colors and information density")
-                ZephyrSettingsRow(
-                    title = "Theme",
-                    description = "Follow the Linux desktop or use an explicit light or dark theme.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = ThemePreference.entries,
-                        selected = settings.themePreference,
-                        label = ThemePreference::label,
-                        onSelected = { selected -> onSettingsChange { it.copy(themePreference = selected) } },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "UI density",
-                    description = "Compact fits more information; Comfortable adds spacing and larger controls.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = UiDensity.entries,
-                        selected = settings.uiDensity,
-                        label = UiDensity::label,
-                        onSelected = { selected -> onSettingsChange { it.copy(uiDensity = selected) } },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Text scale",
-                    description = "Scale all application text and fixed-height controls from 100% to 200%.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = TextScale.entries,
-                        selected = settings.textScale,
-                        label = TextScale::label,
-                        onSelected = { selected -> onSettingsChange { it.copy(textScale = selected) } },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Motion",
-                    description = "Follow the desktop preference or explicitly use full or reduced motion.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = MotionPreference.entries,
-                        selected = settings.motionPreference,
-                        label = MotionPreference::label,
-                        onSelected = { selected -> onSettingsChange { it.copy(motionPreference = selected) } },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Navigation width",
-                    description = if (settings.navigationWidthDp == 0) {
-                        "Using the density-aware default. Drag the sidebar divider to resize."
-                    } else {
-                        "${settings.navigationWidthDp} dp. Drag the sidebar divider to resize."
+        SettingsGroup("Appearance", "Workbench colors and information density") {
+            ZephyrSettingsRow(
+                title = "Theme",
+                description = "Follow the Linux desktop or use an explicit light or dark theme.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = ThemePreference.entries,
+                    selected = settings.themePreference,
+                    label = ThemePreference::label,
+                    onSelected = { selected -> onSettingsChange { it.copy(themePreference = selected) } },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "UI density",
+                description = "Compact fits more information; Comfortable adds spacing and larger controls.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = UiDensity.entries,
+                    selected = settings.uiDensity,
+                    label = UiDensity::label,
+                    onSelected = { selected -> onSettingsChange { it.copy(uiDensity = selected) } },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Text scale",
+                description = "Scale all application text and fixed-height controls from 100% to 200%.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = TextScale.entries,
+                    selected = settings.textScale,
+                    label = TextScale::label,
+                    onSelected = { selected -> onSettingsChange { it.copy(textScale = selected) } },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Motion",
+                description = "Follow the desktop preference or explicitly use full or reduced motion.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = MotionPreference.entries,
+                    selected = settings.motionPreference,
+                    label = MotionPreference::label,
+                    onSelected = { selected -> onSettingsChange { it.copy(motionPreference = selected) } },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Navigation width",
+                description = if (settings.navigationWidthDp == 0) {
+                    "Using the density-aware default. Drag the sidebar divider to resize."
+                } else {
+                    "${settings.navigationWidthDp} dp. Drag the sidebar divider to resize."
+                },
+            ) {
+                ZephyrToolbarButton(
+                    label = "Reset width",
+                    onClick = { onSettingsChange { it.copy(navigationWidthDp = 0) } },
+                    enabled = settings.navigationWidthDp != 0,
+                )
+            }
+        }
+        SettingsGroup("Automation", "Opt-in background metadata maintenance") {
+            ZephyrSettingsRow(
+                title = "Metadata refresh",
+                description = "Refresh the SDKMAN catalog only while Zephyr is open and idle.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = MetadataRefreshSchedule.entries,
+                    selected = settings.metadataRefreshSchedule,
+                    label = MetadataRefreshSchedule::label,
+                    onSelected = { selected ->
+                        onSettingsChange { it.copy(metadataRefreshSchedule = selected) }
                     },
-                ) {
-                    ZephyrToolbarButton(
-                        label = "Reset width",
-                        onClick = { onSettingsChange { it.copy(navigationWidthDp = 0) } },
-                        enabled = settings.navigationWidthDp != 0,
-                    )
-                }
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Update notifications",
+                description = "Show path-free desktop notices for available updates or every completed check.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = UpdateNotificationPolicy.entries,
+                    selected = settings.updateNotificationPolicy,
+                    label = UpdateNotificationPolicy::label,
+                    onSelected = { selected ->
+                        onSettingsChange { it.copy(updateNotificationPolicy = selected) }
+                    },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Operation notifications",
+                description = "Show path-free desktop notices when reviewed operations finish.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = OperationNotificationPolicy.entries,
+                    selected = settings.operationNotificationPolicy,
+                    label = OperationNotificationPolicy::label,
+                    onSelected = { selected ->
+                        onSettingsChange { it.copy(operationNotificationPolicy = selected) }
+                    },
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ZephyrSettingsRow(
+                title = "Local-only grace period",
+                description = "Flag versions for review after this age; Zephyr never deletes them automatically.",
+            ) {
+                ZephyrSegmentedControl(
+                    options = CleanupGracePeriod.entries,
+                    selected = settings.cleanupGracePeriod,
+                    label = CleanupGracePeriod::label,
+                    onSelected = { selected ->
+                        onSettingsChange { it.copy(cleanupGracePeriod = selected) }
+                    },
+                )
             }
         }
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
+        SettingsGroup("Privacy", "Control machine-specific information in the application chrome") {
+            ZephyrSettingsRow(
+                title = "Show SDKMAN home path",
+                description = "Display the local SDKMAN path in the toolbar and status bar.",
             ) {
-                PanelHeading(
-                    "Portable preferences",
-                    "Move non-sensitive appearance, workflow, favorites, profiles, and filter choices between Zephyr installations.",
+                ZephyrToggle(
+                    checked = settings.showSdkmanHome,
+                    onCheckedChange = { visible -> onSettingsChange { it.copy(showSdkmanHome = visible) } },
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZephyrToolbarButton(
-                        label = "Export preferences…",
-                        onClick = {
-                            scope.launch {
-                                runCatching {
-                                    portablePreferencesService.chooseAndWrite(settings.portablePreferences())
-                                }.onSuccess { file ->
-                                    if (file != null) portablePreferencesMessage = "Exported portable preferences to $file."
-                                }.onFailure {
-                                    portablePreferencesMessage = it.message ?: "Preferences export failed."
-                                }
-                            }
-                        },
-                    )
-                    ZephyrToolbarButton(
-                        label = "Import preferences…",
-                        onClick = {
-                            scope.launch {
-                                runCatching { portablePreferencesService.chooseAndRead() }
-                                    .onSuccess { portable ->
-                                        if (portable != null) {
-                                            onSettingsChange { it.applyPortablePreferences(portable) }
-                                            portablePreferencesMessage = "Imported portable preferences."
-                                        }
-                                    }
-                                    .onFailure {
-                                        portablePreferencesMessage = it.message ?: "Preferences import failed."
-                                    }
-                            }
-                        },
-                    )
-                }
-                Text(
-                    "Excluded by design: machine paths, proxy settings and passwords, local observations, caches, and operation history.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                portablePreferencesMessage?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
             }
         }
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
-            ) {
-                PanelHeading(
-                    "SDKMAN installation",
-                    "Choose an explicit SDKMAN home only when automatic discovery is not appropriate.",
-                )
-                KeyValueRow("Active after restart", customSdkmanHome ?: "Automatic discovery")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZephyrToolbarButton(
-                        label = "Choose SDKMAN home…",
-                        onClick = {
-                            scope.launch {
-                                sdkmanHomeService.chooseAndSave()?.let { result ->
-                                    sdkmanHomeMessage = result.message
-                                    if (result.success) customSdkmanHome = result.path
-                                }
-                            }
-                        },
-                    )
-                    ZephyrToolbarButton(
-                        label = "Use automatic discovery",
-                        onClick = {
-                            scope.launch {
-                                val result = sdkmanHomeService.clear()
+        SettingsGroup(
+            "SDKMAN installation",
+            "Choose an explicit SDKMAN home only when automatic discovery is not appropriate.",
+        ) {
+            KeyValueRow("Active after restart", customSdkmanHome ?: "Automatic discovery")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZephyrToolbarButton(
+                    label = "Choose SDKMAN home…",
+                    onClick = {
+                        scope.launch {
+                            sdkmanHomeService.chooseAndSave()?.let { result ->
                                 sdkmanHomeMessage = result.message
-                                customSdkmanHome = null
+                                if (result.success) customSdkmanHome = result.path
                             }
-                        },
-                        enabled = customSdkmanHome != null,
-                    )
-                }
-                sdkmanHomeMessage?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                        }
+                    },
+                )
+                ZephyrToolbarButton(
+                    label = "Use automatic discovery",
+                    onClick = {
+                        scope.launch {
+                            val result = sdkmanHomeService.clear()
+                            sdkmanHomeMessage = result.message
+                            customSdkmanHome = null
+                        }
+                    },
+                    enabled = customSdkmanHome != null,
+                )
+            }
+            sdkmanHomeMessage?.let {
                 Text(
-                    "Selection is accepted only when bin/sdkman-init.sh and candidates/ are present.",
-                    style = MaterialTheme.typography.labelSmall,
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Text(
+                "Selection is accepted only when bin/sdkman-init.sh and candidates/ are present.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(metrics.panelPadding)) {
-                PanelHeading("Automation", "Opt-in background metadata maintenance")
-                ZephyrSettingsRow(
-                    title = "Metadata refresh",
-                    description = "Refresh the SDKMAN catalog only while Zephyr is open and idle.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = MetadataRefreshSchedule.entries,
-                        selected = settings.metadataRefreshSchedule,
-                        label = MetadataRefreshSchedule::label,
-                        onSelected = { selected ->
-                            onSettingsChange { it.copy(metadataRefreshSchedule = selected) }
-                        },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Update notifications",
-                    description = "Show path-free desktop notices for available updates or every completed check.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = UpdateNotificationPolicy.entries,
-                        selected = settings.updateNotificationPolicy,
-                        label = UpdateNotificationPolicy::label,
-                        onSelected = { selected ->
-                            onSettingsChange { it.copy(updateNotificationPolicy = selected) }
-                        },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Operation notifications",
-                    description = "Show path-free desktop notices when reviewed operations finish.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = OperationNotificationPolicy.entries,
-                        selected = settings.operationNotificationPolicy,
-                        label = OperationNotificationPolicy::label,
-                        onSelected = { selected ->
-                            onSettingsChange { it.copy(operationNotificationPolicy = selected) }
-                        },
-                    )
-                }
-                ZephyrSettingsRow(
-                    title = "Local-only grace period",
-                    description = "Flag versions for review after this age; Zephyr never deletes them automatically.",
-                ) {
-                    ZephyrSegmentedControl(
-                        options = CleanupGracePeriod.entries,
-                        selected = settings.cleanupGracePeriod,
-                        label = CleanupGracePeriod::label,
-                        onSelected = { selected ->
-                            onSettingsChange { it.copy(cleanupGracePeriod = selected) }
-                        },
-                    )
-                }
+        SettingsGroup(
+            "Enterprise proxy",
+            "Coordinates stay in preferences; passwords use Linux Secret Service and never enter Zephyr settings.",
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = proxyConfiguration.enabled,
+                    onCheckedChange = { proxyConfiguration = proxyConfiguration.copy(enabled = it) },
+                )
+                Text("Use proxy for SDKMAN network commands", modifier = Modifier.weight(1f))
             }
-        }
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
+            if (proxyConfiguration.hasStoredPassword) {
+                Badge("Password stored securely", BadgeTone.Success)
+            }
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                PanelHeading(
-                    "Enterprise proxy",
-                    "Coordinates stay in preferences; passwords use Linux Secret Service and never enter Zephyr settings.",
+                OutlinedTextField(
+                    value = proxyConfiguration.host,
+                    onValueChange = { proxyConfiguration = proxyConfiguration.copy(host = it.take(255)) },
+                    label = { Text("Host") },
+                    singleLine = true,
+                    modifier = Modifier.width(280.dp * zephyrContentScale()),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(
-                        checked = proxyConfiguration.enabled,
-                        onCheckedChange = { proxyConfiguration = proxyConfiguration.copy(enabled = it) },
-                    )
-                    Text("Use proxy for SDKMAN network commands", modifier = Modifier.weight(1f))
-                }
-                if (proxyConfiguration.hasStoredPassword) {
-                    Badge("Password stored securely", BadgeTone.Success)
-                }
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    OutlinedTextField(
-                        value = proxyConfiguration.host,
-                        onValueChange = { proxyConfiguration = proxyConfiguration.copy(host = it.take(255)) },
-                        label = { Text("Host") },
-                        singleLine = true,
-                        modifier = Modifier.width(280.dp),
-                    )
-                    OutlinedTextField(
-                        value = proxyPort,
-                        onValueChange = { proxyPort = it.filter(Char::isDigit).take(5) },
-                        label = { Text("Port") },
-                        singleLine = true,
-                        modifier = Modifier.width(120.dp),
-                    )
-                    OutlinedTextField(
-                        value = proxyConfiguration.username,
-                        onValueChange = { proxyConfiguration = proxyConfiguration.copy(username = it.take(128)) },
-                        label = { Text("Username (optional)") },
-                        singleLine = true,
-                        modifier = Modifier.width(280.dp),
-                    )
-                    OutlinedTextField(
-                        value = proxyPassword,
-                        onValueChange = { proxyPassword = it.take(512) },
-                        label = { Text(if (proxyConfiguration.hasStoredPassword) "New password (optional)" else "Password (optional)") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.width(280.dp),
-                    )
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ZephyrToolbarButton(
-                        label = "Save proxy",
-                        onClick = {
-                            val port = proxyPort.toIntOrNull() ?: 0
-                            scope.launch {
-                                val result = proxyService.save(
-                                    proxyConfiguration.copy(port = port),
-                                    proxyPassword.takeIf(String::isNotEmpty),
-                                )
-                                proxyMessage = result.message
-                                if (result.success) {
-                                    proxyPassword = ""
-                                    proxyConfiguration = proxyService.load()
-                                    proxyPort = proxyConfiguration.port.toString()
-                                }
-                            }
-                        },
-                    )
-                    ZephyrToolbarButton(
-                        label = "Clear password",
-                        onClick = {
-                            scope.launch {
-                                val result = proxyService.clearPassword()
-                                proxyMessage = result.message
+                OutlinedTextField(
+                    value = proxyPort,
+                    onValueChange = { proxyPort = it.filter(Char::isDigit).take(5) },
+                    label = { Text("Port") },
+                    singleLine = true,
+                    modifier = Modifier.width(120.dp * zephyrContentScale()),
+                )
+                OutlinedTextField(
+                    value = proxyConfiguration.username,
+                    onValueChange = { proxyConfiguration = proxyConfiguration.copy(username = it.take(128)) },
+                    label = { Text("Username (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.width(280.dp * zephyrContentScale()),
+                )
+                OutlinedTextField(
+                    value = proxyPassword,
+                    onValueChange = { proxyPassword = it.take(512) },
+                    label = { Text(if (proxyConfiguration.hasStoredPassword) "New password (optional)" else "Password (optional)") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.width(280.dp * zephyrContentScale()),
+                )
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZephyrToolbarButton(
+                    label = "Save proxy",
+                    onClick = {
+                        val port = proxyPort.toIntOrNull() ?: 0
+                        scope.launch {
+                            val result = proxyService.save(
+                                proxyConfiguration.copy(port = port),
+                                proxyPassword.takeIf(String::isNotEmpty),
+                            )
+                            proxyMessage = result.message
+                            if (result.success) {
+                                proxyPassword = ""
                                 proxyConfiguration = proxyService.load()
+                                proxyPort = proxyConfiguration.port.toString()
                             }
-                        },
-                        enabled = proxyConfiguration.hasStoredPassword,
-                    )
-                }
-                proxyMessage?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                        }
+                    },
+                )
+                ZephyrToolbarButton(
+                    label = "Clear password",
+                    onClick = {
+                        scope.launch {
+                            val result = proxyService.clearPassword()
+                            proxyMessage = result.message
+                            proxyConfiguration = proxyService.load()
+                        }
+                    },
+                    enabled = proxyConfiguration.hasStoredPassword,
+                )
+            }
+            proxyMessage?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        ZephyrPanel(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(metrics.panelPadding)) {
-                PanelHeading("Privacy", "Control machine-specific information in the application chrome")
-                ZephyrSettingsRow(
-                    title = "Show SDKMAN home path",
-                    description = "Display the local SDKMAN path in the toolbar and status bar.",
-                ) {
-                    ZephyrToggle(
-                        checked = settings.showSdkmanHome,
-                        onCheckedChange = { visible -> onSettingsChange { it.copy(showSdkmanHome = visible) } },
-                    )
-                }
+        SettingsGroup(
+            "Portable preferences",
+            "Move non-sensitive appearance, workflow, favorites, profiles, and filter choices between Zephyr installations.",
+        ) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ZephyrToolbarButton(
+                    label = "Export preferences…",
+                    onClick = {
+                        scope.launch {
+                            runCatching {
+                                portablePreferencesService.chooseAndWrite(settings.portablePreferences())
+                            }.onSuccess { file ->
+                                if (file != null) portablePreferencesMessage = "Exported portable preferences to $file."
+                            }.onFailure {
+                                portablePreferencesMessage = it.message ?: "Preferences export failed."
+                            }
+                        }
+                    },
+                )
+                ZephyrToolbarButton(
+                    label = "Import preferences…",
+                    onClick = {
+                        scope.launch {
+                            runCatching { portablePreferencesService.chooseAndRead() }
+                                .onSuccess { portable ->
+                                    if (portable != null) {
+                                        onSettingsChange { it.applyPortablePreferences(portable) }
+                                        portablePreferencesMessage = "Imported portable preferences."
+                                    }
+                                }
+                                .onFailure {
+                                    portablePreferencesMessage = it.message ?: "Preferences import failed."
+                                }
+                        }
+                    },
+                )
+            }
+            Text(
+                "Excluded by design: machine paths, proxy settings and passwords, local observations, caches, and operation history.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            portablePreferencesMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        SettingsGroup("Keyboard shortcuts", "Use Zephyr without leaving the keyboard") {
+            keyboardShortcutHelp.forEach { shortcut ->
+                ZephyrRecordLayout(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    content = { Text(shortcut.description, style = MaterialTheme.typography.bodyMedium) },
+                    actions = { ZephyrKeycap(shortcut.keys) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsGroup(
+    title: String,
+    description: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        PanelHeading(title, description)
         ZephyrPanel(Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(metrics.panelPadding),
+                Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PanelHeading("Keyboard shortcuts", "Use Zephyr without leaving the keyboard")
-                keyboardShortcutHelp.forEach { shortcut ->
-                    ZephyrRecordLayout(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        content = { Text(shortcut.description, style = MaterialTheme.typography.bodyMedium) },
-                        actions = { ZephyrKeycap(shortcut.keys) },
-                    )
-                }
-            }
+                content = content,
+            )
         }
     }
 }
@@ -2544,7 +2567,7 @@ internal fun AboutScreen(state: ZephyrUiState.Ready) {
                 CandidateIcon(CandidateKind.Jdk)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Zephyr", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Version 1.1.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Version 1.2.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Kotlin Multiplatform + Compose Desktop for Linux", style = MaterialTheme.typography.bodyMedium)
                 }
             }

@@ -147,11 +147,7 @@ internal fun SearchField(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    "⌕",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                ZephyrSymbol(ZephyrIcon.Search, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box(Modifier.weight(1f)) {
                     if (value.isEmpty()) {
                         Text(
@@ -342,7 +338,7 @@ internal fun EmptyState(title: String, text: String, action: String? = null, onA
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            if (action != null && onAction != null) Button(onClick = onAction) { Text(action) }
+            if (action != null && onAction != null) Button(onClick = onAction, shape = MaterialTheme.shapes.small) { Text(action) }
         }
     }
 }

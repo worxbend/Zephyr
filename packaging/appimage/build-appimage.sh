@@ -9,15 +9,11 @@ case "$(uname -m)" in
         appimage_arch=x86_64
         release_arch=amd64
         tool_sha256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
-        runtime_asset_id=456065460
-        runtime_sha256=1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf
         ;;
     aarch64|arm64)
         appimage_arch=aarch64
         release_arch=arm64
         tool_sha256=f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
-        runtime_asset_id=456064894
-        runtime_sha256=7d5d772b7c32f0c84caf0a452a3072a5709027d7eac5856feb89a7a7a8881372
         ;;
     *)
         echo "Unsupported AppImage architecture: $(uname -m)" >&2
@@ -77,13 +73,12 @@ echo "$tool_sha256  $tool" | sha256sum --check --status
 chmod +x "$tool"
 
 runtime="$tool_dir/runtime-$appimage_arch"
-if [[ ! -f "$runtime" ]] || ! echo "$runtime_sha256  $runtime" | sha256sum --check --status; then
-    curl --fail --location --silent --show-error \
-        --header "Accept: application/octet-stream" \
-        "https://api.github.com/repos/AppImage/type2-runtime/releases/assets/$runtime_asset_id" \
-        --output "$runtime"
-fi
-echo "$runtime_sha256  $runtime" | sha256sum --check --status
+# Reuse the type-2 runtime from the checksum-pinned tool itself. Upstream's
+# mutable `continuous` runtime release deletes old asset IDs, breaking rebuilds.
+runtime_size=$("$tool" --appimage-offset)
+[[ "$runtime_size" =~ ^[0-9]+$ ]] && [[ "$runtime_size" -gt 0 ]]
+dd if="$tool" of="$runtime" bs=64K count="$runtime_size" iflag=count_bytes status=none
+[[ $(stat -c %s "$runtime") -eq "$runtime_size" ]]
 
 output_dir="$project_root/dist"
 output="$output_dir/Zephyr-$version-linux-$release_arch.AppImage"

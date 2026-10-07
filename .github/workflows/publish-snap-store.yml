@@ -4,16 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: GitHub release tag containing the validated Snap assets
+        description: Published GitHub release containing both validated Snap assets
         required: true
-        default: v1.0.0
         type: string
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+    secrets:
+      SNAPCRAFT_TOKEN:
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: publish-snap-store-${{ inputs.release_tag }}
+  group: publish-snap-store-zephyr-latest-stable
   cancel-in-progress: false
 
 jobs:
@@ -22,80 +29,59 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - amd64
-          - arm64
+        arch: [amd64, arm64]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.release_tag }}
-      STORE_LOGIN: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-
+      ARCH: ${{ matrix.arch }}
     steps:
-      - name: Validate publication inputs
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate publication tag
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "release_tag must be a version tag such as v1.0.0." >&2
-            exit 1
-          fi
-          if [[ -z "$STORE_LOGIN" ]]; then
-            echo "The SNAPCRAFT_STORE_CREDENTIALS repository secret is not configured." >&2
-            exit 1
-          fi
-
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'packaging')
+          from release import require, version_value
+          tag = os.environ['RELEASE_TAG']
+          require(tag.startswith('v'), 'Release tag must start with v')
+          version_value(tag[1:])
+          PY
       - name: Download released Snap and checksum
         id: download
         env:
-          EXPECTED_ARCH: ${{ matrix.arch }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          version=${RELEASE_TAG#v}
-          asset="Zephyr-${version}-linux-${EXPECTED_ARCH}.snap"
+          [[ $(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft) == false ]]
+          asset="Zephyr-${RELEASE_TAG#v}-linux-$ARCH.snap"
           mkdir -p release
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern SHA256SUMS \
-            --pattern "$asset" \
-            --dir release
-
-          checksum=$(awk -v name="$asset" '$2 == name { print $1 }' release/SHA256SUMS)
-          if [[ ! "$checksum" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "SHA256SUMS does not contain exactly one valid digest for $asset." >&2
-            exit 1
-          fi
-          printf '%s  %s\n' "$checksum" "$asset" |
-            (cd release && sha256sum --check -)
-          printf 'snap_path=%s\n' "release/$asset" >> "$GITHUB_OUTPUT"
-
+          gh release download "$RELEASE_TAG" --pattern SHA256SUMS --pattern "$asset" --dir release
+          printf 'snap_path=release/%s\n' "$asset" >> "$GITHUB_OUTPUT"
       - name: Install Snap inspection tools
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends squashfs-tools
-
-      - name: Validate released Snap metadata
+      - name: Verify released bytes, metadata and native architecture
         env:
-          EXPECTED_ARCH: ${{ matrix.arch }}
+          SNAP_PATH: ${{ steps.download.outputs.snap_path }}
         run: |
-          version=${RELEASE_TAG#v}
-          snap_path="release/Zephyr-${version}-linux-${EXPECTED_ARCH}.snap"
-          metadata=$(unsquashfs -cat "$snap_path" meta/snap.yaml)
-
-          grep -Fxq "name: zephyr-sdkman" <<<"$metadata"
-          grep -Fxq "version: $version" <<<"$metadata"
-          grep -Fxq "confinement: classic" <<<"$metadata"
-          grep -Fxq "grade: stable" <<<"$metadata"
-          grep -Fxq -- "- $EXPECTED_ARCH" <<<"$metadata"
-
-          listing=$(mktemp)
-          unsquashfs -ll "$snap_path" > "$listing"
-          grep -Fq "meta/gui/zephyr.desktop" "$listing"
-          grep -Fq "usr/share/applications/com.worxbend.zephyr.desktop" "$listing"
-          grep -Fq "usr/lib/zephyr/bin/com.worxbend.zephyr" "$listing"
-
+          python3 packaging/release.py artifact "$SNAP_PATH" --version "${RELEASE_TAG#v}" \
+            --arch "$ARCH" --format snap --checksums release/SHA256SUMS
+      - name: Refuse an older release than the current stable channel
+        env:
+          SNAP_PATH: ${{ steps.download.outputs.snap_path }}
+        run: python3 packaging/verify_snap_store.py --before-publish --version "${RELEASE_TAG#v}" --arch "$ARCH" --snap-path "$SNAP_PATH"
       - name: Publish released Snap to stable
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ env.STORE_LOGIN }}
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
         uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
         with:
           snap: ${{ steps.download.outputs.snap_path }}
           release: stable
+      - name: Read back public stable channel
+        env:
+          SNAP_PATH: ${{ steps.download.outputs.snap_path }}
+        run: python3 packaging/verify_snap_store.py --version "${RELEASE_TAG#v}" --arch "$ARCH" --snap-path "$SNAP_PATH"

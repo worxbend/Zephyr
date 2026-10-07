@@ -7,7 +7,7 @@ confinement cannot provide those host-development-environment semantics.
 
 Before the release workflow can publish:
 
-1. Sign in to Snapcraft and register the `zephyr-sdkman` name.
+1. The publisher has registered the `zephyr` name.
 2. Submit a classic-confinement request in Canonical's store-requests forum.
    Zephyr fits the documented supported category “tools for local, non-root
    user driven configuration of/switching to development
@@ -17,7 +17,7 @@ Before the release workflow can publish:
 
    ```shell
    snapcraft export-login \
-     --snaps=zephyr-sdkman \
+     --snaps=zephyr \
      --channels=stable \
      --acls=package_access,package_push,package_update,package_release \
      --expires=2027-07-30 \
@@ -25,17 +25,20 @@ Before the release workflow can publish:
    ```
 
 4. Save that file's complete contents as the repository Actions secret
-   `SNAPCRAFT_STORE_CREDENTIALS`.
+   `SNAPCRAFT_TOKEN` (already present in this repository). Workflows map this
+   secret to the `SNAPCRAFT_STORE_CREDENTIALS` environment variable only in the
+   publishing step. Do not print the credential or add it to the repository.
 5. Delete the exported credential file after the secret is configured.
 6. Publish the already-built, checksum-verified release snaps:
 
    ```shell
-   gh workflow run publish-snap-store.yml -f release_tag=v1.0.0
+   gh workflow run publish-snap-store.yml -f release_tag=v1.2.0
    ```
 
-Without the secret or while review is pending, both architecture-specific
-`.snap` files are still built and attached to the GitHub release. A failed
-Snap Store upload is reported but cannot discard successful release packages.
-The manually triggered publisher is strict: it reports failure if either
-architecture cannot be validated or published, while `fail-fast: false` still
-lets the other architecture attempt publication.
+Tag releases call this publisher automatically after the complete GitHub
+release is public. Without a usable secret or while review is pending, both
+architecture-specific `.snap` files are still built and attached to the GitHub
+release. A failed Store upload fails the workflow but cannot discard verified
+GitHub packages. Both automatic and manual publication are strict: either
+architecture failing validation, publication, or exact-digest Store readback
+makes the workflow fail; `fail-fast: false` lets the other architecture finish.

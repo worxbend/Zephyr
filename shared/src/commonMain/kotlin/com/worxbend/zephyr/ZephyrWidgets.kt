@@ -88,11 +88,11 @@ internal fun ZephyrPanel(
     val metrics = LocalZephyrMetrics.current
     Surface(
         modifier = modifier,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         shape = RoundedCornerShape(metrics.cornerRadius),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
-        shadowElevation = 1.dp,
+        shadowElevation = 0.dp,
         content = content,
     )
 }
@@ -184,17 +184,7 @@ internal fun ZephyrNavigationItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(5.dp),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(glyph, color = contentColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-        }
+        ZephyrSymbol(navigationSymbol(glyph), tint = contentColor)
         Text(
             text = label,
             modifier = Modifier.weight(1f),
@@ -207,8 +197,15 @@ internal fun ZephyrNavigationItem(
         badge?.let {
             Text(
                 text = it,
-                color = contentColor.copy(alpha = 0.78f),
+                color = contentColor,
                 style = MaterialTheme.typography.labelSmall,
+            )
+        }
+        if (glyph.startsWith("›") || glyph.startsWith("⌄")) {
+            ZephyrSymbol(
+                if (glyph.startsWith("⌄")) ZephyrIcon.ChevronDown else ZephyrIcon.ChevronRight,
+                modifier = Modifier.size(14.dp),
+                tint = contentColor,
             )
         }
     }
@@ -221,6 +218,7 @@ internal fun ZephyrToolbarButton(
     modifier: Modifier = Modifier,
     detail: String? = null,
     enabled: Boolean = true,
+    suggested: Boolean = false,
 ) {
     val metrics = LocalZephyrMetrics.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -229,16 +227,18 @@ internal fun ZephyrToolbarButton(
     var focused by remember { mutableStateOf(false) }
     val fill = zephyrAnimatedColor(
         when {
+            suggested && enabled && pressed -> MaterialTheme.colorScheme.primaryContainer
+            suggested -> MaterialTheme.colorScheme.primary
             enabled && pressed -> MaterialTheme.colorScheme.primaryContainer
-            enabled && hovered -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> MaterialTheme.colorScheme.surfaceContainer
+            enabled && hovered -> MaterialTheme.colorScheme.surfaceContainerHighest
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
     )
     Surface(
         modifier = modifier
             .height(metrics.controlHeight)
             .alpha(if (enabled) 1f else 0.5f)
-            .clip(RoundedCornerShape(metrics.cornerRadius))
+            .clip(MaterialTheme.shapes.small)
             .hoverable(interactionSource, enabled)
             .onFocusChanged { focused = it.isFocused }
             .clickable(
@@ -249,10 +249,10 @@ internal fun ZephyrToolbarButton(
                 onClick = onClick,
             ),
         color = fill,
-        shape = RoundedCornerShape(metrics.cornerRadius),
+        shape = MaterialTheme.shapes.small,
         border = BorderStroke(
-            1.dp,
-            if (focused || (enabled && hovered)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            2.dp,
+            if (focused) MaterialTheme.colorScheme.onSurface else Color.Transparent,
         ),
     ) {
         Row(
@@ -260,7 +260,16 @@ internal fun ZephyrToolbarButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                color = when {
+                    suggested && enabled && pressed -> MaterialTheme.colorScheme.onPrimaryContainer
+                    suggested -> MaterialTheme.colorScheme.onPrimary
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+            )
             detail?.let {
                 StatusDot(tone = if (it == "failed" || it == "offline") StatusTone.Error else StatusTone.Accent)
                 Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -287,7 +296,7 @@ internal fun ZephyrMetricTile(
                 StatusDot(tone)
                 Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = statusColor(tone))
+            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
