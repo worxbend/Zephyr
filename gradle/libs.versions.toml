@@ -1,6 +1,6 @@
 [versions]
 composeMultiplatform = "1.11.1"
-kotlin = "2.4.0"
+kotlin = "2.4.20"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
 okio = "3.17.0"
