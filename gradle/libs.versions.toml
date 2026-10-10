@@ -1,5 +1,5 @@
 [versions]
-composeMultiplatform = "1.11.1"
+composeMultiplatform = "1.12.1"
 kotlin = "2.4.0"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
