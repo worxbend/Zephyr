@@ -36,7 +36,7 @@ Before the release workflow can publish:
 6. Publish the already-built, checksum-verified release snaps:
 
    ```shell
-   gh workflow run publish-snap-store.yml -f release_tag=v1.2.2
+   gh workflow run publish-snap-store.yml -f release_tag=v1.2.3
    ```
 
 Tag releases call this publisher automatically after the complete GitHub

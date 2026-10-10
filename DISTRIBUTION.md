@@ -1,6 +1,6 @@
 # Linux distribution
 
-Zephyr `1.2.2` is packaged natively on GitHub-hosted `amd64` and `arm64`
+Zephyr `1.2.3` is packaged natively on GitHub-hosted `amd64` and `arm64`
 machines. Native builds matter because Compose Desktop bundles an
 architecture-specific JVM and Skiko library; the build does not cross-compile
 those components.
@@ -111,7 +111,7 @@ publication after approval or credential renewal, use the already-verified
 GitHub assets without rebuilding them:
 
 ```shell
-gh workflow run publish-snap-store.yml -f release_tag=v1.2.2
+gh workflow run publish-snap-store.yml -f release_tag=v1.2.3
 ```
 
 The dedicated workflow downloads each architecture's `.snap` and
