@@ -1,7 +1,6 @@
 package com.worxbend.zephyr.sdkman
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import com.worxbend.zephyr.domain.ConnectivityDiagnostic
 import com.worxbend.zephyr.domain.ConnectivityOutcome
@@ -9,17 +8,7 @@ import com.worxbend.zephyr.domain.ConnectivityRouteKind
 import com.worxbend.zephyr.domain.boundedConnectivityLatencyMillis
 import com.worxbend.zephyr.logging.ZephyrLogger
 import okio.Path
-import org.apache.commons.exec.CommandLine
-import org.apache.commons.exec.DefaultExecutor
-import org.apache.commons.exec.ExecuteResultHandler
-import org.apache.commons.exec.ExecuteException
-import org.apache.commons.exec.ExecuteWatchdog
-import org.apache.commons.exec.PumpStreamHandler
-import java.io.ByteArrayOutputStream
-import java.time.Duration as JavaDuration
-import kotlin.coroutines.resume
 import kotlin.time.Duration
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 class ApacheCommonsSdkmanCommandRunner(
     private val sdkmanHome: Path,
@@ -50,88 +39,20 @@ class ApacheCommonsSdkmanCommandRunner(
         command: SdkmanCommand,
         timeout: Duration,
         environment: Map<String, String>,
-    ): SdkmanCommandResult =
-        withContext(Dispatchers.IO) {
-            val stdout = BoundedByteArrayOutputStream(MAX_COMMAND_OUTPUT_BYTES)
-            val stderr = BoundedByteArrayOutputStream(MAX_COMMAND_OUTPUT_BYTES)
-            val executor = DefaultExecutor.builder()
-                .setExecuteStreamHandler(PumpStreamHandler(stdout, stderr))
-                .get()
-            val watchdog = ExecuteWatchdog.builder()
-                .setTimeout(JavaDuration.ofMillis(timeout.inWholeMilliseconds))
-                .get()
-            executor.watchdog = watchdog
-            executor.setExitValues(null)
-
-            val shell = CommandLine(BASH_PATH)
-            // SDKMAN is a shell function, so a shell is unavoidable. The explicit Bash
-            // path and cleared BASH_ENV prevent user startup scripts from being evaluated.
-            shell.addArgument("--noprofile")
-            shell.addArgument("--norc")
-            shell.addArgument("-c")
-            shell.addArgument(shellCommand(command), false)
-
-            var executionFailure: ExecuteException? = null
-            val exitCode = try {
-                suspendCancellableCoroutine<Int> { continuation ->
-                    val handler = object : ExecuteResultHandler {
-                        override fun onProcessComplete(exitValue: Int) {
-                            continuation.resume(exitValue)
-                        }
-
-                        override fun onProcessFailed(exception: ExecuteException) {
-                            executionFailure = exception
-                            continuation.resume(exception.exitValue)
-                        }
-                    }
-                    continuation.invokeOnCancellation { watchdog.destroyProcess() }
-                    if (continuation.isActive) {
-                        executor.execute(shell, environment, handler)
-                    }
-                }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                if (command is SdkmanCommand.ConnectivityProbe) {
-                    ZephyrLogger.warn("SDKMAN connectivity diagnostic failed before completion.")
-                } else {
-                    ZephyrLogger.warn("SDKMAN command failed before completion: $command", exception)
-                }
-                return@withContext SdkmanCommandResult(
-                    exitCode = -1,
-                    stdout = stdout.toString(Charsets.UTF_8.name()).stripAnsi(),
-                    stderr = listOf(stderr.toString(Charsets.UTF_8.name()), exception.message.orEmpty())
-                        .filter { it.isNotBlank() }
-                        .joinToString("\n")
-                        .stripAnsi(),
-                    timedOut = watchdog.killedProcess(),
-                )
-            }
-
-            val diagnosticMessages = buildList {
-                if (watchdog.killedProcess()) add("Command timed out after $timeout.")
-                if (stdout.truncated || stderr.truncated) add("Command output was truncated.")
-                executionFailure?.message?.takeIf { it.isNotBlank() }?.let(::add)
-            }
-            if (watchdog.killedProcess()) {
-                ZephyrLogger.warn("SDKMAN command timed out: $command")
-            } else if (exitCode != 0) {
-                if (command is SdkmanCommand.ConnectivityProbe) {
-                    ZephyrLogger.warn("SDKMAN connectivity diagnostic exited with $exitCode.")
-                } else {
-                    ZephyrLogger.warn("SDKMAN command exited with $exitCode: $command\n${stderr.toString(Charsets.UTF_8.name()).stripAnsi()}")
-                }
-            }
-            SdkmanCommandResult(
-                exitCode = if (watchdog.killedProcess()) -1 else exitCode,
-                stdout = stdout.toString(Charsets.UTF_8.name()).stripAnsi(),
-                stderr = (listOf(stderr.toString(Charsets.UTF_8.name())) + diagnosticMessages)
-                    .filter { it.isNotBlank() }
-                    .joinToString("\n")
-                    .stripAnsi(),
-                timedOut = watchdog.killedProcess(),
-            )
+    ): SdkmanCommandResult = withContext(Dispatchers.IO) {
+        val result = SdkmanProcessSession().execute(
+            listOf(BASH_PATH, "--noprofile", "--norc", "-c", shellCommand(command)),
+            environment,
+            timeout,
+        ).let { it.copy(stdout = it.stdout.stripAnsi(), stderr = it.stderr.stripAnsi()) }
+        if (result.timedOut) {
+            ZephyrLogger.warn("SDKMAN command timed out: $command")
+        } else if (!result.success) {
+            // Output can contain private paths or proxy details. Log status only.
+            ZephyrLogger.warn("SDKMAN command exited with ${result.exitCode}.")
         }
+        result
+    }
 
     private fun sanitizedEnvironment(): Map<String, String> {
         val environment = System.getenv().toMutableMap()
@@ -212,25 +133,6 @@ internal fun classifyConnectivity(result: SdkmanCommandResult): ConnectivityOutc
     }
 }
 
-private class BoundedByteArrayOutputStream(
-    private val limit: Int,
-) : ByteArrayOutputStream() {
-    var truncated: Boolean = false
-        private set
-
-    override fun write(value: Int) {
-        if (count < limit) super.write(value) else truncated = true
-    }
-
-    override fun write(buffer: ByteArray, offset: Int, length: Int) {
-        require(offset >= 0 && length >= 0 && offset <= buffer.size - length) { "Invalid byte array range." }
-        val writable = (limit - count).coerceAtLeast(0).coerceAtMost(length)
-        if (writable > 0) super.write(buffer, offset, writable)
-        if (writable < length) truncated = true
-    }
-}
-
-private const val MAX_COMMAND_OUTPUT_BYTES = 1_048_576
 private const val BASH_PATH = "/bin/bash"
 private const val SDKMAN_HEALTH_URL = "https://api.sdkman.io/2/healthcheck"
 private const val NANOS_PER_MILLISECOND = 1_000_000L

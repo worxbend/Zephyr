@@ -1,5 +1,8 @@
 package com.worxbend.zephyr.viewmodel
 
+import com.worxbend.zephyr.application.operation.OperationAdmission
+import com.worxbend.zephyr.application.operation.OperationCoordinator
+import com.worxbend.zephyr.application.operation.OperationReview
 import com.worxbend.zephyr.data.DiagnosticsExporter
 import com.worxbend.zephyr.data.CandidateMetadataCache
 import com.worxbend.zephyr.data.OperationJournalExporter
@@ -13,6 +16,7 @@ import com.worxbend.zephyr.domain.CandidateKind
 import com.worxbend.zephyr.domain.CandidateVersion
 import com.worxbend.zephyr.domain.BatchItemStatus
 import com.worxbend.zephyr.domain.CommandOutcome
+import com.worxbend.zephyr.domain.CommandOutcomeStatus
 import com.worxbend.zephyr.domain.ConnectivityState
 import com.worxbend.zephyr.domain.ConnectivityStatus
 import com.worxbend.zephyr.domain.ConnectivityDiagnostic
@@ -49,7 +53,15 @@ import com.worxbend.zephyr.domain.VersionStorage
 import com.worxbend.zephyr.domain.RemoteAvailability
 import com.worxbend.zephyr.domain.RemoteEvidenceState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -60,6 +72,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ZephyrViewModelTest {
     @Test
     fun activityInboxLoadsAndPersistsAcknowledgementAcrossRestarts() {
@@ -219,7 +232,7 @@ class ZephyrViewModelTest {
 
         assertEquals(listOf("install:java:21-tem"), repository.mutationCalls)
         assertEquals(
-            OperationStatus.Failed,
+            OperationStatus.Indeterminate,
             assertIs<ZephyrUiState.Ready>(viewModel.state.value).operationJournal.single().status,
         )
         viewModel.close()
@@ -398,6 +411,188 @@ class ZephyrViewModelTest {
         }
         assertTrue(repository.mutationCalls.isEmpty())
         viewModel.close()
+    }
+
+    @Test
+    fun liveMutationPreventsLocalOnlyAuditAndFailedReadRetryFromStarting() = runTest {
+        val installGate = CompletableDeferred<Unit>()
+        val java = remoteCandidate("java", CandidateKind.Jdk)
+        val repository = FakeSdkmanRepository(installedCandidate = java, installGate = installGate)
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+        runCurrent()
+        try {
+            vm.scanLocalOnly()
+            runCurrent()
+            assertEquals(listOf("java"), assertIs<ZephyrUiState.Ready>(vm.state.value).localOnlyScanProgress?.failures?.map { it.candidate })
+            vm.install("java", "21-tem")
+            runCurrent()
+            assertTrue(assertIs<ZephyrUiState.Ready>(vm.state.value).liveOperationIds.isNotEmpty())
+            val installedReads = repository.installedCandidatesCalls
+            val connectivityReads = repository.connectivityCalls
+
+            vm.scanLocalOnly()
+            vm.retryFailedLocalOnlyReads()
+            runCurrent()
+
+            assertEquals(installedReads, repository.installedCandidatesCalls, "An audit must not read a live mutation's inventory")
+            assertEquals(connectivityReads, repository.connectivityCalls)
+            assertEquals(null, assertIs<ZephyrUiState.Ready>(vm.state.value).localOnlyScanProgress)
+            assertFalse(assertIs<ZephyrUiState.Ready>(vm.state.value).localOnlyScanInProgress)
+        } finally {
+            installGate.complete(Unit)
+            runCurrent()
+            vm.close()
+        }
+    }
+
+    @Test
+    fun mutationInvalidatesSuspendedAuditBeforeSnapshotOrFindingCanPublish() = runTest {
+        listOf(true, false).forEach { suspendSnapshot ->
+            val readStarted = CompletableDeferred<Unit>()
+            val readGate = CompletableDeferred<Unit>()
+            val installed = remoteCandidate("gradle").copy(
+                installedVersions = listOf(CandidateVersion("8.10", true, false, false)),
+            )
+            val obsoleteFinding = installed.copy(
+                hasLocalOnlyVersions = true,
+                localOnlyVersionCount = 1,
+                localOnlyVersions = listOf("8.10"),
+                remoteEvidence = RemoteEvidenceState.LiveComplete,
+            )
+            val fake = FakeSdkmanRepository()
+            var inventoryReads = 0
+            var mutated = false
+            val repository = object : SdkmanRepository by fake {
+                override suspend fun installedCandidates(): List<Candidate> {
+                    inventoryReads += 1
+                    val snapshot = listOf(installed.copy(description = if (mutated) "post mutation" else "before mutation"))
+                    if (suspendSnapshot && inventoryReads == 2) {
+                        readStarted.complete(Unit)
+                        readGate.await()
+                    }
+                    return snapshot
+                }
+
+                override suspend fun mergedCandidate(candidate: String): Candidate {
+                    if (!suspendSnapshot) {
+                        readStarted.complete(Unit)
+                        readGate.await()
+                    }
+                    return obsoleteFinding
+                }
+
+                override suspend fun install(candidate: String, version: String): CommandOutcome {
+                    mutated = true
+                    return fake.install(candidate, version)
+                }
+            }
+            val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+            runCurrent()
+            val observations = mutableListOf<Candidate>()
+            val observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                vm.state.collect { state ->
+                    observations += (state as? ZephyrUiState.Ready)?.localOnlyScanProgress?.trustedFindings.orEmpty()
+                }
+            }
+            try {
+                vm.scanLocalOnly()
+                runCurrent()
+                readStarted.await()
+                vm.install("gradle", "8.14")
+                runCurrent()
+                assertEquals(OperationStatus.Succeeded, assertIs<ZephyrUiState.Ready>(vm.state.value).operationJournal.single().status)
+                assertEquals(null, assertIs<ZephyrUiState.Ready>(vm.state.value).localOnlyScanProgress)
+
+                readGate.complete(Unit)
+                runCurrent()
+
+                assertTrue(observations.isEmpty(), "An obsolete audit must not become observation history (snapshot gate: $suspendSnapshot)")
+                val ready = assertIs<ZephyrUiState.Ready>(vm.state.value)
+                assertEquals(null, ready.localOnlyScanProgress)
+                assertFalse(ready.localOnlyScanInProgress)
+                assertEquals("post mutation", ready.candidates.single().description)
+                vm.cleanLocalOnly("gradle", listOf("8.10"))
+                runCurrent()
+                assertEquals(null, assertIs<ZephyrUiState.Ready>(vm.state.value).pendingTransaction)
+                assertEquals(listOf("install:gradle:8.14"), fake.mutationCalls)
+                val readsAfterMutation = inventoryReads
+                vm.retryFailedLocalOnlyReads()
+                runCurrent()
+                assertEquals(readsAfterMutation, inventoryReads)
+                vm.scanLocalOnly()
+                runCurrent()
+                assertTrue(observations.isNotEmpty(), "A fresh post-mutation audit must still publish trusted findings")
+                vm.cleanLocalOnly("gradle", listOf("8.10"))
+                runCurrent()
+                assertIs<SdkmanTransaction.CleanLocalOnly>(assertIs<ZephyrUiState.Ready>(vm.state.value).pendingTransaction)
+            } finally {
+                observer.cancel()
+                readGate.complete(Unit)
+                vm.close()
+            }
+        }
+    }
+
+    @Test
+    fun invalidatedAuditFailureCannotClearLiveMutationStateOrPublishActivity() = runTest {
+        listOf(true, false).forEach { suspendConnectivity ->
+            val readStarted = CompletableDeferred<Unit>()
+            val readGate = CompletableDeferred<Unit>()
+            val installGate = CompletableDeferred<Unit>()
+            val fake = FakeSdkmanRepository(installGate = installGate)
+            var connectivityReads = 0
+            var inventoryReads = 0
+            val repository = object : SdkmanRepository by fake {
+                override suspend fun checkConnectivity(): ConnectivityStatus {
+                    connectivityReads += 1
+                    if (suspendConnectivity && connectivityReads == 2) {
+                        readStarted.complete(Unit)
+                        readGate.await()
+                        return testConnectivity(ConnectivityOutcome.Service)
+                    }
+                    return testConnectivity()
+                }
+
+                override suspend fun installedCandidates(): List<Candidate> {
+                    inventoryReads += 1
+                    if (!suspendConnectivity && inventoryReads == 2) {
+                        readStarted.complete(Unit)
+                        readGate.await()
+                        error("obsolete inventory failure")
+                    }
+                    return emptyList()
+                }
+            }
+            val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+            runCurrent()
+            try {
+                vm.scanLocalOnly()
+                runCurrent()
+                readStarted.await()
+                vm.install("gradle", "8.14")
+                runCurrent()
+                readGate.complete(Unit)
+                runCurrent()
+
+                val live = assertIs<ZephyrUiState.Ready>(vm.state.value)
+                assertTrue(live.liveOperationIds.isNotEmpty())
+                assertTrue(live.isRefreshing, "A stale audit failure must not clear mutation busy state")
+                assertEquals(ConnectivityState.Online, live.connectivityStatus.state)
+                assertEquals(null, live.localOnlyScanProgress)
+                assertFalse(live.localOnlyScanInProgress)
+                assertEquals(null, live.errorMessage)
+                assertTrue(live.activityEvents.isEmpty())
+                installGate.complete(Unit)
+                runCurrent()
+                val completed = assertIs<ZephyrUiState.Ready>(vm.state.value)
+                assertEquals(OperationStatus.Succeeded, completed.operationJournal.single().status)
+                assertEquals(listOf("Installed"), completed.activityEvents.map { it.message })
+            } finally {
+                readGate.complete(Unit)
+                installGate.complete(Unit)
+                vm.close()
+            }
+        }
     }
 
     @Test
@@ -655,7 +850,8 @@ class ZephyrViewModelTest {
         assertEquals(listOf("install:gradle:8.14"), repository.mutationCalls)
         assertTrue(!ready.isRefreshing)
         assertEquals(OperationStatus.Interrupted, ready.operationJournal.single().status)
-        assertEquals(OperationStepStatus.Indeterminate, ready.operationJournal.single().steps.first().status)
+        // Persistence uncertainty must not erase a known execution receipt in memory.
+        assertEquals(OperationStepStatus.Succeeded, ready.operationJournal.single().steps.first().status)
         assertTrue(ready.errorMessage.orEmpty().contains("execution stopped"))
         assertEquals(null, ready.localOnlyScanProgress)
         val installedCallsAfterAbort = repository.installedCandidatesCalls
@@ -763,7 +959,7 @@ class ZephyrViewModelTest {
         val exported = exporter.exported.single()
         assertEquals(OperationStatus.Succeeded, exported.single().status)
         assertEquals(1_000L, exported.single().startedAtEpochMillis)
-        assertEquals(1_001L, exported.single().completedAtEpochMillis)
+        assertTrue(requireNotNull(exported.single().completedAtEpochMillis) > exported.single().startedAtEpochMillis)
         assertEquals(
             "Exported 1 journal entries to /tmp/zephyr-journal.csv.",
             assertIs<ZephyrUiState.Ready>(viewModel.state.value).lastOutcome,
@@ -931,6 +1127,47 @@ class ZephyrViewModelTest {
     }
 
     @Test
+    fun verifyingIndeterminateOnlyTaskCanConfirmSuccessWithoutReplayingMutation() = runTest {
+        val transaction = SdkmanTransaction.Uninstall("gradle", "8.10")
+        val stored = OperationJournalEntry(
+            id = 74,
+            transaction = transaction,
+            startedAtEpochMillis = 100,
+            status = OperationStatus.Indeterminate,
+            steps = listOf(OperationStep(0, transaction.commands.single(), OperationStepStatus.Indeterminate)),
+        )
+        val satisfactionStarted = CompletableDeferred<Unit>()
+        val satisfactionGate = CompletableDeferred<Unit>()
+        val store = InMemoryOperationStore(listOf(stored))
+        val repository = FakeSdkmanRepository(satisfactionReader = {
+            satisfactionStarted.complete(Unit)
+            satisfactionGate.await()
+            CommandSatisfaction.Satisfied
+        })
+        val viewModel = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        try {
+            assertEquals(OperationStatus.Indeterminate, assertIs<ZephyrUiState.Ready>(viewModel.state.value).operationJournal.single().status)
+            viewModel.requestResumeOperation(stored.id)
+            runCurrent()
+            satisfactionStarted.await()
+            assertTrue(repository.mutationCalls.isEmpty())
+            satisfactionGate.complete(Unit)
+            runCurrent()
+            val ready = assertIs<ZephyrUiState.Ready>(viewModel.state.value)
+            assertEquals(OperationStatus.Succeeded, ready.operationJournal.single().status)
+            assertEquals(OperationStepStatus.Succeeded, ready.operationJournal.single().steps.single().status)
+            assertEquals(OperationStatus.Succeeded, store.load().single().status)
+            assertEquals(null, ready.pendingTransaction)
+            assertTrue(repository.mutationCalls.isEmpty())
+        } finally {
+            satisfactionGate.complete(Unit)
+            viewModel.close()
+            runCurrent()
+        }
+    }
+
+    @Test
     fun retainsConsecutiveOperationActivityInOrder() {
         val repository = FakeSdkmanRepository()
         var now = 10L
@@ -1037,6 +1274,484 @@ class ZephyrViewModelTest {
         viewModel.close()
     }
 
+    @Test
+    fun journaledConfirmationCannotBeDroppedByNavigationRead() = runTest {
+        val saveStarted = CompletableDeferred<Unit>()
+        val saveGate = CompletableDeferred<Unit>()
+        val detailStarted = CompletableDeferred<Unit>()
+        val detailGate = CompletableDeferred<Unit>()
+        val store = object : OperationStore {
+            var entries = emptyList<OperationJournalEntry>()
+            override suspend fun load() = entries
+            override suspend fun save(entries: List<OperationJournalEntry>) {
+                saveStarted.complete(Unit)
+                saveGate.await()
+                this.entries = entries
+            }
+        }
+        val repository = FakeSdkmanRepository(detailStarted = detailStarted, detailGate = detailGate)
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        try {
+            vm.requestTransaction(SdkmanTransaction.Uninstall("gradle", "8.10"))
+            runCurrent()
+            vm.confirmTransaction()
+            runCurrent()
+            saveStarted.await()
+            vm.navigate(ZephyrRoute.SdkDetail("gradle"))
+            runCurrent()
+            // With exclusive ownership the read may queue; with independent reads it may start.
+            saveGate.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("uninstall:gradle:8.10"), repository.mutationCalls)
+            assertEquals(OperationStatus.Succeeded, store.entries.single().status)
+            detailGate.complete(Unit)
+            runCurrent()
+        } finally {
+            detailGate.complete(Unit)
+            saveGate.complete(Unit)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun successfulMutationReceiptSurvivesGatedInventoryFailure() = runTest {
+        val refreshStarted = CompletableDeferred<Unit>()
+        val refreshGate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(
+            refreshStarted = refreshStarted,
+            refreshGate = refreshGate,
+            refreshFailure = IllegalStateException("inventory unavailable"),
+        )
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+        runCurrent()
+        try {
+            vm.requestTransaction(SdkmanTransaction.Uninstall("gradle", "8.10"))
+            runCurrent()
+            vm.confirmTransaction()
+            runCurrent()
+            refreshStarted.await()
+            refreshGate.complete(Unit)
+            runCurrent()
+            val ready = assertIs<ZephyrUiState.Ready>(vm.state.value)
+            assertEquals(OperationStatus.Succeeded, ready.operationJournal.single().status)
+            assertEquals("Uninstalled", ready.operationJournal.single().outcome)
+            assertEquals(listOf("uninstall:gradle:8.10"), repository.mutationCalls)
+            assertTrue(ready.errorMessage.orEmpty().contains("refresh", ignoreCase = true))
+            assertEquals(null, ready.storageInventory)
+            assertEquals(null, ready.localOnlyScanProgress)
+        } finally {
+            refreshGate.complete(Unit)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun recoveryRejectsLiveOwnedBatchBeforeAnyReconciliationRead() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(installStarted = started, installGate = gate)
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+        runCurrent()
+        try {
+            vm.requestTransaction(SdkmanTransaction.BatchInstall(listOf(
+                InstallTarget("gradle", "8.14"), InstallTarget("kotlin", "2.2.0"),
+            )))
+            runCurrent()
+            vm.confirmTransaction()
+            runCurrent()
+            started.await()
+            val id = assertIs<ZephyrUiState.Ready>(vm.state.value).operationJournal.single().id
+            vm.requestResumeOperation(id)
+            runCurrent()
+            assertEquals(0, repository.commandSatisfactionCalls)
+            gate.complete(Unit)
+            runCurrent()
+            val entry = assertIs<ZephyrUiState.Ready>(vm.state.value).operationJournal.single()
+            assertEquals(OperationStatus.Succeeded, entry.status)
+            assertTrue(entry.steps.all { it.status == OperationStepStatus.Succeeded })
+        } finally {
+            gate.complete(Unit)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun singleOperationsRetainIndeterminateReceipts() = runTest {
+        val uncertain = CommandOutcome(false, "Could not verify", CommandOutcomeStatus.Indeterminate)
+        listOf(
+            SdkmanTransaction.Install("gradle", "8.10"),
+            SdkmanTransaction.Uninstall("gradle", "8.10"),
+            SdkmanTransaction.SetDefault("gradle", "8.10"),
+        ).forEach { transaction ->
+            val repository = FakeSdkmanRepository(
+                installOutcome = uncertain, uninstallOutcomes = mapOf("8.10" to uncertain), defaultOutcome = uncertain,
+            )
+            val store = InMemoryOperationStore()
+            val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+            runCurrent()
+            vm.requestTransaction(transaction)
+            runCurrent()
+            vm.confirmTransaction()
+            runCurrent()
+            val entry = store.load().single()
+            assertEquals(OperationStatus.Indeterminate, entry.status)
+            assertEquals(OperationStepStatus.Indeterminate, entry.steps.single().status)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun cleanupRetainsEachVerifiedRemovalReceipt() = runTest {
+        val finding = remoteCandidate("gradle").copy(
+            installedVersions = listOf(CandidateVersion("8.10", true, false, false), CandidateVersion("8.11", true, false, false)),
+            hasLocalOnlyVersions = true, localOnlyVersionCount = 2, localOnlyVersions = listOf("8.10", "8.11"),
+            remoteEvidence = RemoteEvidenceState.LiveComplete,
+        )
+        val repository = FakeSdkmanRepository(
+            installedCandidate = finding, remoteDetail = finding,
+            cleanupOutcomes = mapOf(
+                "8.10" to CommandOutcome(true, "Removed first"),
+                "8.11" to CommandOutcome(false, "Second uncertain", CommandOutcomeStatus.Indeterminate),
+            ),
+        )
+        val store = InMemoryOperationStore()
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        vm.scanLocalOnly()
+        runCurrent()
+        vm.requestTransaction(SdkmanTransaction.CleanLocalOnly("gradle", listOf("8.10", "8.11")))
+        runCurrent()
+        vm.confirmTransaction()
+        runCurrent()
+        val entry = store.load().single()
+        assertEquals(listOf(OperationStepStatus.Succeeded, OperationStepStatus.Indeterminate), entry.steps.map { it.status })
+        assertEquals(listOf("Removed first", "Second uncertain"), entry.steps.map { it.outcome })
+        assertEquals(OperationStatus.Indeterminate, entry.status)
+        assertEquals(listOf("clean:gradle:8.10", "clean:gradle:8.11"), repository.mutationCalls)
+        vm.close()
+    }
+
+    @Test
+    fun returningToSameRouteDoesNotPublishObsoleteDetailRead() = runTest {
+        val oldGate = CompletableDeferred<Unit>()
+        val latestGate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(detailReader = { candidate, call ->
+            if (call == 1) {
+                oldGate.await()
+                remoteCandidate(candidate).copy(description = "obsolete")
+            } else {
+                latestGate.await()
+                remoteCandidate(candidate).copy(description = "latest")
+            }
+        })
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+        runCurrent()
+        try {
+            vm.navigate(ZephyrRoute.SdkDetail("gradle"))
+            runCurrent()
+            vm.navigate(ZephyrRoute.SdkDetail("kotlin"))
+            vm.navigate(ZephyrRoute.SdkDetail("gradle"))
+            oldGate.complete(Unit)
+            runCurrent()
+            assertEquals(null, assertIs<ZephyrUiState.Ready>(vm.state.value).selectedCandidate)
+            latestGate.complete(Unit)
+            runCurrent()
+            assertEquals("latest", assertIs<ZephyrUiState.Ready>(vm.state.value).selectedCandidate?.description)
+        } finally {
+            oldGate.complete(Unit)
+            latestGate.complete(Unit)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun unreadableLedgerIsVisibleAndBlocksAdmissionWithoutSaving() = runTest {
+        val store = object : OperationStore {
+            var saves = 0
+            override suspend fun load(): List<OperationJournalEntry> = error("corrupt original")
+            override suspend fun save(entries: List<OperationJournalEntry>) { saves += 1 }
+        }
+        val repository = FakeSdkmanRepository()
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        vm.requestTransaction(SdkmanTransaction.Uninstall("gradle", "8.10"))
+        runCurrent()
+        vm.confirmTransaction()
+        runCurrent()
+        val ready = assertIs<ZephyrUiState.Ready>(vm.state.value)
+        assertTrue(ready.errorMessage.orEmpty().contains("ledger", ignoreCase = true))
+        assertTrue(repository.mutationCalls.isEmpty())
+        assertEquals(0, store.saves)
+        vm.close()
+    }
+
+    @Test
+    fun cancellingLiveWorkPersistsInterruptedOwnershipAndUncertainty() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(installStarted = started, installGate = gate)
+        val store = InMemoryOperationStore()
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        vm.requestTransaction(SdkmanTransaction.BatchInstall(listOf(
+            InstallTarget("gradle", "8.14"), InstallTarget("kotlin", "2.2.0"),
+        )))
+        runCurrent()
+        vm.confirmTransaction()
+        runCurrent()
+        started.await()
+        vm.close()
+        runCurrent()
+        val entry = store.load().single()
+        assertEquals(OperationStatus.Interrupted, entry.status)
+        assertEquals(OperationStepStatus.Indeterminate, entry.steps.first().status)
+        assertEquals(OperationStepStatus.Pending, entry.steps.last().status)
+        assertEquals(listOf("install:gradle:8.14"), repository.mutationCalls)
+    }
+
+    @Test
+    fun shutdownAcknowledgementWaitsForInterruptedReceiptSave() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val executionGate = CompletableDeferred<Unit>()
+        val receiptStarted = CompletableDeferred<Unit>()
+        val receiptGate = CompletableDeferred<Unit>()
+        val store = object : OperationStore {
+            var entries = emptyList<OperationJournalEntry>()
+            override suspend fun load() = entries
+            override suspend fun save(entries: List<OperationJournalEntry>) {
+                if (entries.any { it.status == OperationStatus.Interrupted }) {
+                    receiptStarted.complete(Unit)
+                    receiptGate.await()
+                }
+                this.entries = entries
+            }
+        }
+        val repository = FakeSdkmanRepository(installStarted = started, installGate = executionGate)
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store)
+        runCurrent()
+        vm.requestTransaction(SdkmanTransaction.Install("gradle", "8.14"))
+        runCurrent()
+        val admission = requireNotNull(vm.confirmTransaction())
+        runCurrent()
+        started.await()
+        assertIs<OperationAdmission.Accepted>(admission.await())
+        val shutdown = async { vm.shutdownAndJoin() }
+        runCurrent()
+        receiptStarted.await()
+        assertFalse(shutdown.isCompleted)
+        assertEquals(OperationStatus.Running, store.entries.single().status)
+        receiptGate.complete(Unit)
+        runCurrent()
+        assertTrue(shutdown.await())
+        assertEquals(OperationStatus.Interrupted, store.entries.single().status)
+        assertEquals(OperationStepStatus.Indeterminate, store.entries.single().steps.single().status)
+    }
+
+    @Test
+    fun coordinatorQueuesAdmissionAndExplicitlyRejectsQueuedWorkOnShutdown() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(installGate = gate)
+        val store = InMemoryOperationStore()
+        val coordinator = OperationCoordinator(repository, store, StandardTestDispatcher(testScheduler), { 1L })
+        coordinator.initialize()
+        val first = coordinator.submit(SdkmanTransaction.Install("gradle", "8.14"))
+        runCurrent()
+        assertIs<OperationAdmission.Accepted>(first.await())
+        val second = coordinator.submit(SdkmanTransaction.Install("kotlin", "2.2.0"))
+        runCurrent()
+        assertFalse(second.isCompleted)
+        val shutdown = async { coordinator.shutdownAndJoin() }
+        runCurrent()
+        assertTrue(shutdown.await())
+        assertIs<OperationAdmission.Rejected>(second.await())
+        assertEquals(listOf("install:gradle:8.14"), repository.mutationCalls)
+        assertEquals(OperationStatus.Interrupted, store.load().single().status)
+    }
+
+    @Test
+    fun recoveryEvidenceAndExecutionWritesAreSerialized() = runTest {
+        val evidenceStarted = CompletableDeferred<Unit>()
+        val evidenceGate = CompletableDeferred<Unit>()
+        val transaction = SdkmanTransaction.Install("gradle", "8.14")
+        val interrupted = OperationJournalEntry(72, transaction, 1, status = OperationStatus.Interrupted)
+        val repository = FakeSdkmanRepository(satisfactionReader = {
+            evidenceStarted.complete(Unit)
+            evidenceGate.await()
+            CommandSatisfaction.Unsatisfied
+        })
+        val store = InMemoryOperationStore(listOf(interrupted))
+        val coordinator = OperationCoordinator(repository, store, StandardTestDispatcher(testScheduler), { 2L })
+        coordinator.initialize()
+        val review = async { coordinator.reviewRemaining(72) }
+        runCurrent()
+        evidenceStarted.await()
+        val admission = coordinator.submit(SdkmanTransaction.Install("kotlin", "2.2.0"))
+        runCurrent()
+        assertFalse(admission.isCompleted)
+        assertTrue(repository.mutationCalls.isEmpty())
+        evidenceGate.complete(Unit)
+        runCurrent()
+        assertIs<OperationReview.Reviewed>(review.await())
+        assertIs<OperationAdmission.Accepted>(admission.await())
+        val saved = store.load()
+        assertEquals(OperationStatus.Succeeded, saved.first().status)
+        assertEquals(OperationStatus.Interrupted, saved.last().status)
+        assertTrue(coordinator.shutdownAndJoin())
+    }
+
+    @Test
+    fun shutdownDoesNotRewriteKnownSuccessWhileTerminalSaveSuspends() = runTest {
+        val terminalStarted = CompletableDeferred<Unit>()
+        val store = object : OperationStore {
+            var entries = emptyList<OperationJournalEntry>()
+            var terminalAttempts = 0
+            override suspend fun load() = entries
+            override suspend fun save(entries: List<OperationJournalEntry>) {
+                if (entries.any { it.status == OperationStatus.Succeeded }) {
+                    terminalAttempts += 1
+                    if (terminalAttempts == 1) {
+                        terminalStarted.complete(Unit)
+                        CompletableDeferred<Unit>().await()
+                    }
+                }
+                this.entries = entries
+            }
+        }
+        val coordinator = OperationCoordinator(FakeSdkmanRepository(), store, StandardTestDispatcher(testScheduler), { 1L })
+        coordinator.initialize()
+        val admission = coordinator.submit(SdkmanTransaction.Uninstall("gradle", "8.10"))
+        runCurrent()
+        terminalStarted.await()
+        assertIs<OperationAdmission.Accepted>(admission.await())
+        val shutdown = async { coordinator.shutdownAndJoin() }
+        runCurrent()
+        assertTrue(shutdown.await())
+        assertEquals(OperationStatus.Succeeded, store.entries.single().status)
+        assertEquals(OperationStepStatus.Succeeded, store.entries.single().steps.single().status)
+    }
+
+    @Test
+    fun latestRouteReadDoesNotWaitForObsoleteSuspendedDetail() = runTest {
+        val obsoleteGate = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(detailReader = { candidate, _ ->
+            if (candidate == "gradle") obsoleteGate.await()
+            remoteCandidate(candidate)
+        })
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler))
+        runCurrent()
+        try {
+            vm.navigate(ZephyrRoute.SdkDetail("gradle"))
+            runCurrent()
+            vm.navigate(ZephyrRoute.SdkDetail("kotlin"))
+            runCurrent()
+            val ready = assertIs<ZephyrUiState.Ready>(vm.state.value)
+            assertEquals("kotlin", ready.selectedCandidate?.name)
+            assertEquals(null, ready.detailLoadingCandidate)
+        } finally {
+            vm.close()
+            obsoleteGate.complete(Unit)
+        }
+    }
+
+    @Test
+    fun mutationDetailRefreshCannotPublishCandidateAIntoFailedRouteB() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val refreshStarted = CompletableDeferred<Unit>()
+        val repository = FakeSdkmanRepository(detailReader = { candidate, call ->
+            if (call == 2) {
+                refreshStarted.complete(Unit)
+                refreshGate.await()
+            }
+            if (candidate == "kotlin") error("B unavailable")
+            remoteCandidate(candidate)
+        })
+        val store = InMemoryOperationStore()
+        val vm = ZephyrViewModel(repository, StandardTestDispatcher(testScheduler), operationStore = store, readRetryDelaysMillis = emptyList())
+        runCurrent()
+        try {
+            vm.navigate(ZephyrRoute.SdkDetail("gradle"))
+            runCurrent()
+            vm.requestTransaction(SdkmanTransaction.Uninstall("gradle", "8.10"))
+            runCurrent()
+            vm.confirmTransaction()
+            runCurrent()
+            refreshStarted.await()
+            vm.navigate(ZephyrRoute.SdkDetail("kotlin"))
+            runCurrent()
+            refreshGate.complete(Unit)
+            runCurrent()
+            val ready = assertIs<ZephyrUiState.Ready>(vm.state.value)
+            assertEquals(ZephyrRoute.SdkDetail("kotlin"), ready.route)
+            assertEquals(null, ready.selectedCandidate)
+            assertTrue(ready.errorMessage.orEmpty().contains("B unavailable"))
+            assertEquals(OperationStatus.Succeeded, store.load().single().status)
+        } finally {
+            refreshGate.complete(Unit)
+            vm.close()
+        }
+    }
+
+    @Test
+    fun shutdownReportsUnacknowledgedReceiptInsteadOfClaimingSuccess() = runTest {
+        val executionGate = CompletableDeferred<Unit>()
+        val store = object : OperationStore {
+            var entries = emptyList<OperationJournalEntry>()
+            override suspend fun load() = entries
+            override suspend fun save(entries: List<OperationJournalEntry>) {
+                if (entries.any { it.status == OperationStatus.Interrupted }) CompletableDeferred<Unit>().await()
+                this.entries = entries
+            }
+        }
+        val coordinator = OperationCoordinator(
+            FakeSdkmanRepository(installGate = executionGate), store, StandardTestDispatcher(testScheduler), { 1L },
+            receiptTimeoutMillis = 50L,
+        )
+        coordinator.initialize()
+        val admission = coordinator.submit(SdkmanTransaction.Install("gradle", "8.14"))
+        runCurrent()
+        assertIs<OperationAdmission.Accepted>(admission.await())
+        val shutdown = async { coordinator.shutdownAndJoin(timeoutMillis = 100L) }
+        advanceUntilIdle()
+        assertFalse(shutdown.await())
+        assertTrue(coordinator.state.value.ledgerFailure.orEmpty().contains("timed out"))
+        assertEquals(OperationStatus.Interrupted, coordinator.state.value.entries.single().status)
+        // The last durable running plan remains complete for startup verification.
+        assertEquals(OperationStatus.Running, store.entries.single().status)
+        assertEquals(SdkmanTransaction.Install("gradle", "8.14"), store.entries.single().transaction)
+    }
+
+    @Test
+    fun cancellationDuringStepAdmissionDoesNotInventAnExternalOutcome() = runTest {
+        val stepSaveStarted = CompletableDeferred<Unit>()
+        val store = object : OperationStore {
+            var entries = emptyList<OperationJournalEntry>()
+            var saves = 0
+            override suspend fun load() = entries
+            override suspend fun save(entries: List<OperationJournalEntry>) {
+                saves += 1
+                if (saves == 2) {
+                    stepSaveStarted.complete(Unit)
+                    CompletableDeferred<Unit>().await()
+                }
+                this.entries = entries
+            }
+        }
+        val repository = FakeSdkmanRepository()
+        val coordinator = OperationCoordinator(repository, store, StandardTestDispatcher(testScheduler), { 1L })
+        coordinator.initialize()
+        val admission = coordinator.submit(SdkmanTransaction.Install("gradle", "8.14"))
+        runCurrent()
+        stepSaveStarted.await()
+        assertIs<OperationAdmission.Accepted>(admission.await())
+        val shutdown = async { coordinator.shutdownAndJoin() }
+        runCurrent()
+        assertTrue(shutdown.await())
+        assertTrue(repository.mutationCalls.isEmpty())
+        assertEquals(OperationStatus.Interrupted, store.entries.single().status)
+        assertEquals(OperationStepStatus.Interrupted, store.entries.single().steps.single().status)
+    }
+
     private fun testScope() = Dispatchers.Unconfined
 }
 
@@ -1062,17 +1777,25 @@ private class FakeSdkmanRepository(
     private val installedCandidate: Candidate? = null,
     private val refreshStarted: CompletableDeferred<Unit>? = null,
     private val refreshGate: CompletableDeferred<Unit>? = null,
+    private val refreshFailure: Throwable? = null,
     private val detailStarted: CompletableDeferred<Unit>? = null,
     private val detailGate: CompletableDeferred<Unit>? = null,
     private val detailCompleted: CompletableDeferred<Unit>? = null,
+    private val detailReader: (suspend (String, Int) -> Candidate?)? = null,
     private val installOutcome: CommandOutcome = CommandOutcome(true, "Installed"),
     private val installOutcomes: Map<Pair<String, String>, CommandOutcome> = emptyMap(),
     private val installFailure: Throwable? = null,
+    private val uninstallOutcomes: Map<String, CommandOutcome> = emptyMap(),
+    private val defaultOutcome: CommandOutcome = CommandOutcome(true, "Default"),
+    private val cleanupOutcomes: Map<String, CommandOutcome> = emptyMap(),
+    private val installStarted: CompletableDeferred<Unit>? = null,
+    private val installGate: CompletableDeferred<Unit>? = null,
     private var connectivity: ConnectivityStatus = testConnectivity(),
     private val connectivityResponses: List<ConnectivityStatus> = emptyList(),
     private val firstConnectivityStarted: CompletableDeferred<Unit>? = null,
     private val firstConnectivityGate: CompletableDeferred<Unit>? = null,
     private val commandSatisfaction: Map<PlannedSdkmanCommand, CommandSatisfaction> = emptyMap(),
+    private val satisfactionReader: (suspend (PlannedSdkmanCommand) -> CommandSatisfaction)? = null,
     private val storageInventory: StorageInventory = StorageInventory.Empty,
 ) : SdkmanRepository {
     var installedCandidatesCalls: Int = 0
@@ -1083,11 +1806,14 @@ private class FakeSdkmanRepository(
     var metadataRefreshCalls: Int = 0
         private set
     val mutationCalls = mutableListOf<String>()
+    var commandSatisfactionCalls = 0
+        private set
     var connectivityCalls: Int = 0
         private set
     var storageInventoryCalls: Int = 0
         private set
     private val protected = mutableSetOf<ProtectedVersion>()
+    private var detailCalls = 0
 
     override suspend fun detect(): SdkmanStatus = SdkmanStatus(isInstalled = true, home = "/tmp/sdkman")
 
@@ -1098,6 +1824,7 @@ private class FakeSdkmanRepository(
         if (installedCandidatesCalls > 1) {
             refreshStarted?.complete(Unit)
             refreshGate?.await()
+            refreshFailure?.let { throw it }
         }
         return listOfNotNull(installedCandidate)
     }
@@ -1118,6 +1845,8 @@ private class FakeSdkmanRepository(
     override suspend fun versions(candidate: String): List<CandidateVersion> = emptyList()
 
     override suspend fun mergedCandidate(candidate: String): Candidate? {
+        detailCalls += 1
+        detailReader?.let { return it(candidate, detailCalls) }
         detailStarted?.complete(Unit)
         try {
             detailGate?.await()
@@ -1183,27 +1912,32 @@ private class FakeSdkmanRepository(
 
     override suspend fun install(candidate: String, version: String): CommandOutcome {
         mutationCalls += "install:$candidate:$version"
+        installStarted?.complete(Unit)
+        installGate?.await()
         installFailure?.let { throw it }
         return installOutcomes[candidate to version] ?: installOutcome
     }
 
     override suspend fun uninstall(candidate: String, version: String): CommandOutcome {
         mutationCalls += "uninstall:$candidate:$version"
-        return CommandOutcome(true, "Uninstalled")
+        return uninstallOutcomes[version] ?: CommandOutcome(true, "Uninstalled")
     }
 
     override suspend fun setDefault(candidate: String, version: String): CommandOutcome {
         mutationCalls += "default:$candidate:$version"
-        return CommandOutcome(true, "Default")
+        return defaultOutcome
     }
 
     override suspend fun cleanLocalOnly(candidate: String, versions: List<String>): CommandOutcome {
         mutationCalls += "clean:$candidate:${versions.joinToString(",")}"
-        return CommandOutcome(true, "Cleaned")
+        return cleanupOutcomes[versions.singleOrNull()] ?: CommandOutcome(true, "Cleaned")
     }
 
-    override suspend fun commandSatisfaction(command: PlannedSdkmanCommand): CommandSatisfaction =
-        commandSatisfaction[command] ?: CommandSatisfaction.Indeterminate
+    override suspend fun commandSatisfaction(command: PlannedSdkmanCommand): CommandSatisfaction {
+        commandSatisfactionCalls += 1
+        satisfactionReader?.let { return it(command) }
+        return commandSatisfaction[command] ?: CommandSatisfaction.Indeterminate
+    }
 }
 
 private class InMemoryOperationStore(

@@ -13,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,118 +24,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.worxbend.zephyr.data.createDesktopNotificationService
-import com.worxbend.zephyr.data.createSdkmanRepository
-import com.worxbend.zephyr.data.createOperationStore
-import com.worxbend.zephyr.data.createActivityStore
-import com.worxbend.zephyr.data.currentEpochMillis
 import com.worxbend.zephyr.domain.CandidateMetadataStatus
-import com.worxbend.zephyr.domain.ProtectedVersion
 import com.worxbend.zephyr.domain.SdkmanSelfUpdateStatus
 import com.worxbend.zephyr.domain.displayNameFor
 import com.worxbend.zephyr.settings.AppSettingsStore
 import com.worxbend.zephyr.settings.ThemePreference
-import com.worxbend.zephyr.settings.OperationNotificationPolicy
-import com.worxbend.zephyr.settings.UpdateNotificationPolicy
-import com.worxbend.zephyr.settings.createAppSettingsRepository
-import com.worxbend.zephyr.settings.reconcileLocalOnlyObservations
 import com.worxbend.zephyr.settings.reducesMotion
 import com.worxbend.zephyr.viewmodel.ZephyrRoute
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import com.worxbend.zephyr.viewmodel.ZephyrViewModel
-import kotlinx.coroutines.delay
 
 @Composable
-fun App() {
-    val viewModel = remember {
-        ZephyrViewModel(
-            repository = createSdkmanRepository(),
-            operationStore = createOperationStore(),
-            activityStore = createActivityStore(),
-        )
-    }
-    val settingsStore = remember { AppSettingsStore(createAppSettingsRepository()) }
-    val notificationService = remember { createDesktopNotificationService() }
-    DisposableEffect(viewModel, settingsStore) {
-        onDispose {
-            viewModel.close()
-            settingsStore.close()
-        }
-    }
+fun App(viewModel: ZephyrViewModel, settingsStore: AppSettingsStore) {
     val state by viewModel.state.collectAsState()
     val settings by settingsStore.state.collectAsState()
+    val settingsSaveStatus by settingsStore.saveStatus.collectAsState()
     var systemDarkTheme by remember { mutableStateOf(false) }
     var systemReducedMotion by remember { mutableStateOf(false) }
-    var lastUpdateNotificationKey by remember { mutableStateOf<String?>(null) }
-    var lastOperationNotificationId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(Unit) {
         systemDarkTheme = isSystemDarkMode()
         systemReducedMotion = isSystemReducedMotion()
-    }
-    LaunchedEffect(settings.metadataRefreshSchedule) {
-        val interval = settings.metadataRefreshSchedule.intervalMillis ?: return@LaunchedEffect
-        while (true) {
-            delay(interval)
-            viewModel.refreshMetadataIfIdle()
-        }
-    }
-    LaunchedEffect(state, settings.updateNotificationPolicy) {
-        val ready = state as? ZephyrUiState.Ready
-        if (settings.updateNotificationPolicy == UpdateNotificationPolicy.Off) {
-            lastUpdateNotificationKey = null
-            return@LaunchedEffect
-        }
-        if (ready == null) return@LaunchedEffect
-        if (ready.isCatalogLoading) {
-            if (settings.updateNotificationPolicy == UpdateNotificationPolicy.AllChecks) {
-                lastUpdateNotificationKey = null
-            }
-            return@LaunchedEffect
-        }
-        if (ready.catalog.isEmpty()) return@LaunchedEffect
-        val notification = updateNotification(
-            policy = settings.updateNotificationPolicy,
-            candidates = ready.candidates,
-            catalog = ready.catalog,
-        )
-        if (notification == null) {
-            lastUpdateNotificationKey = "${settings.updateNotificationPolicy.name}:current"
-            return@LaunchedEffect
-        }
-        val notificationKey = "${settings.updateNotificationPolicy.name}:${notification.signature}"
-        if (notificationKey == lastUpdateNotificationKey) return@LaunchedEffect
-        lastUpdateNotificationKey = notificationKey
-        notificationService.show(notification.title, notification.message)
-    }
-    LaunchedEffect(state, settings.operationNotificationPolicy) {
-        if (settings.operationNotificationPolicy == OperationNotificationPolicy.Off) {
-            lastOperationNotificationId = null
-            return@LaunchedEffect
-        }
-        val ready = state as? ZephyrUiState.Ready ?: return@LaunchedEffect
-        val entry = ready.operationJournal
-            .asSequence()
-            .filter { it.completedAtEpochMillis != null }
-            .maxByOrNull { it.id }
-            ?: return@LaunchedEffect
-        if (entry.id == lastOperationNotificationId) return@LaunchedEffect
-        lastOperationNotificationId = entry.id
-        operationNotification(settings.operationNotificationPolicy, entry)?.let { notification ->
-            notificationService.show(notification.title, notification.message)
-        }
-    }
-    LaunchedEffect(state, settings.cleanupGracePeriod) {
-        val ready = state as? ZephyrUiState.Ready ?: return@LaunchedEffect
-        val localOnly = ready.candidates
-            .flatMap { candidate ->
-                candidate.localOnlyVersions.map { version ->
-                    ProtectedVersion(candidate.name, version)
-                }
-            }
-            .toSet()
-        settingsStore.update {
-            it.reconcileLocalOnlyObservations(localOnly, currentEpochMillis())
-        }
     }
     val darkTheme = when (settings.themePreference) {
         ThemePreference.System -> systemDarkTheme
@@ -159,6 +66,8 @@ fun App() {
                     viewModel = viewModel,
                     settings = settings,
                     onSettingsChange = settingsStore::update,
+                    settingsSaveStatus = settingsSaveStatus,
+                    onRetrySettingsSave = settingsStore::retry,
                     darkTheme = darkTheme,
                     onToggleTheme = {
                         settingsStore.update {

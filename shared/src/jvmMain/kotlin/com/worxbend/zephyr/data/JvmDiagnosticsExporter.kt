@@ -25,9 +25,8 @@ internal class JvmDiagnosticsExporter(
             val destination = uniqueDiagnosticsDestination(directory, "zephyr-support-$timestamp", ".txt")
             Files.writeString(
                 destination,
-                snapshot.toSupportText().redactPaths(
-                    sensitivePaths() + listOfNotNull(snapshot.sdkmanStatus.home),
-                ),
+                SensitiveTextRedactor(sensitivePaths() + listOfNotNull(snapshot.sdkmanStatus.home))
+                    .redact(snapshot.toSupportText()),
                 StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE,
@@ -91,12 +90,6 @@ private fun defaultDiagnosticsDirectory(): Path {
 
 private fun defaultDiagnosticsSensitivePaths(): List<String> =
     defaultSensitiveExportPaths()
-
-private fun String.redactPaths(sensitivePaths: List<String>): String =
-    sensitivePaths
-        .filter { it.isNotBlank() }
-        .sortedByDescending(String::length)
-        .fold(this) { redacted, path -> redacted.replace(path, "<redacted-path>") }
 
 private fun uniqueDiagnosticsDestination(directory: Path, stem: String, extension: String): Path {
     var destination = directory.resolve("$stem$extension")

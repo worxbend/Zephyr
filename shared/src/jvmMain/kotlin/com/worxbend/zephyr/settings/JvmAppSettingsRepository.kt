@@ -1,333 +1,36 @@
 package com.worxbend.zephyr.settings
 
-import com.worxbend.zephyr.domain.InstallTarget
-import com.worxbend.zephyr.domain.DesiredCandidateState
-import com.worxbend.zephyr.domain.DesiredStateSourceKind
-import com.worxbend.zephyr.domain.DesiredToolchainState
-import java.nio.charset.StandardCharsets
-import java.util.Base64
 import java.util.prefs.Preferences
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class JvmAppSettingsRepository(
-    private val preferences: Preferences = Preferences.userNodeForPackage(JvmAppSettingsRepository::class.java),
+    private val persistence: SettingsSnapshotPersistence,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AppSettingsRepository {
-    override suspend fun load(): AppSettings = withContext(Dispatchers.IO) {
-        AppSettings(
-            themePreference = preferences.enumValue(THEME_KEY, ThemePreference.System),
-            uiDensity = preferences.enumValue(DENSITY_KEY, UiDensity.Compact),
-            textScale = preferences.enumValue(TEXT_SCALE_KEY, TextScale.Percent100),
-            motionPreference = preferences.enumValue(MOTION_KEY, MotionPreference.System),
-            metadataRefreshSchedule = preferences.enumValue(REFRESH_SCHEDULE_KEY, MetadataRefreshSchedule.Off),
-            updateNotificationPolicy = preferences.enumValue(NOTIFICATION_POLICY_KEY, UpdateNotificationPolicy.Off),
-            operationNotificationPolicy = preferences.enumValue(
-                OPERATION_NOTIFICATION_POLICY_KEY,
-                OperationNotificationPolicy.Off,
-            ),
-            cleanupGracePeriod = preferences.enumValue(CLEANUP_GRACE_KEY, CleanupGracePeriod.Off),
-            localOnlyObservations = preferences.localOnlyObservations(LOCAL_ONLY_OBSERVATIONS_KEY),
-            showSdkmanHome = preferences.getBoolean(SHOW_SDKMAN_HOME_KEY, true),
-            favoriteCandidates = preferences.stringSet(FAVORITE_CANDIDATES_KEY),
-            favoriteJdkVendors = preferences.stringSet(FAVORITE_JDK_VENDORS_KEY),
-            recentCandidates = preferences.stringList(RECENT_CANDIDATES_KEY),
-            toolchainProfiles = preferences.profiles(PROFILES_KEY),
-            projectWorkspaces = preferences.projectWorkspaces(PROJECT_WORKSPACES_KEY),
-            desiredToolchainState = preferences.desiredToolchainState(),
-            navigationWidthDp = preferences.getInt(NAVIGATION_WIDTH_KEY, 0).normalizedNavigationWidth(),
-            installedViewMode = preferences.enumValue(INSTALLED_VIEW_MODE_KEY, CollectionViewMode.Cards),
-            catalogViewMode = preferences.enumValue(CATALOG_VIEW_MODE_KEY, CollectionViewMode.Cards),
-            savedJdkFilters = preferences.savedJdkFilters(SAVED_JDK_FILTERS_KEY),
-        )
+    constructor(
+        preferences: Preferences = Preferences.userNodeForPackage(JvmAppSettingsRepository::class.java),
+    ) : this(PreferencesSettingsPersistence(preferences))
+
+    // Serializes this repository's load/commit boundary without blocking the UI dispatcher.
+    private val lock = Any()
+
+    override suspend fun load(): AppSettings = withContext(dispatcher) {
+        synchronized(lock) { readValidated() }
     }
 
-    override suspend fun save(settings: AppSettings) = withContext(Dispatchers.IO) {
-        preferences.put(THEME_KEY, settings.themePreference.name)
-        preferences.put(DENSITY_KEY, settings.uiDensity.name)
-        preferences.put(TEXT_SCALE_KEY, settings.textScale.name)
-        preferences.put(MOTION_KEY, settings.motionPreference.name)
-        preferences.put(REFRESH_SCHEDULE_KEY, settings.metadataRefreshSchedule.name)
-        preferences.put(NOTIFICATION_POLICY_KEY, settings.updateNotificationPolicy.name)
-        preferences.put(OPERATION_NOTIFICATION_POLICY_KEY, settings.operationNotificationPolicy.name)
-        preferences.put(CLEANUP_GRACE_KEY, settings.cleanupGracePeriod.name)
-        preferences.put(LOCAL_ONLY_OBSERVATIONS_KEY, settings.localOnlyObservations.encodeLocalOnlyObservations())
-        preferences.putBoolean(SHOW_SDKMAN_HOME_KEY, settings.showSdkmanHome)
-        preferences.put(FAVORITE_CANDIDATES_KEY, settings.favoriteCandidates.encode())
-        preferences.put(FAVORITE_JDK_VENDORS_KEY, settings.favoriteJdkVendors.encode())
-        preferences.put(RECENT_CANDIDATES_KEY, settings.recentCandidates.encode())
-        preferences.put(PROFILES_KEY, settings.toolchainProfiles.encodeProfiles())
-        preferences.put(PROJECT_WORKSPACES_KEY, settings.projectWorkspaces.encodeProjectWorkspaces())
-        preferences.saveDesiredToolchainState(settings.desiredToolchainState)
-        preferences.putInt(NAVIGATION_WIDTH_KEY, settings.navigationWidthDp.normalizedNavigationWidth())
-        preferences.put(INSTALLED_VIEW_MODE_KEY, settings.installedViewMode.name)
-        preferences.put(CATALOG_VIEW_MODE_KEY, settings.catalogViewMode.name)
-        preferences.put(SAVED_JDK_FILTERS_KEY, settings.savedJdkFilters.encodeSavedJdkFilters())
-        preferences.flush()
+    override suspend fun save(settings: AppSettings) = withContext(dispatcher) {
+        val snapshot = AppSettingsCodec.encode(settings)
+        synchronized(lock) {
+            // Do not turn a failed/unsupported read into defaults and overwrite its evidence.
+            readValidated()
+            persistence.commit(snapshot)
+        }
     }
 
-    private inline fun <reified T : Enum<T>> Preferences.enumValue(key: String, fallback: T): T =
-        get(key, fallback.name)
-            .let { stored -> enumValues<T>().firstOrNull { it.name == stored } }
-            ?: fallback
-
-    private fun Preferences.stringSet(key: String): Set<String> =
-        get(key, "")
-            .lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .toSet()
-
-    private fun Set<String>.encode(): String =
-        asSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .distinct()
-            .sorted()
-            .joinToString("\n")
-
-    private fun Preferences.stringList(key: String): List<String> =
-        get(key, "")
-            .lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .distinct()
-            .toList()
-
-    private fun List<String>.encode(): String =
-        asSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .distinct()
-            .joinToString("\n")
-
-    private fun Preferences.profiles(key: String): List<ToolchainProfile> =
-        get(key, "")
-            .lineSequence()
-            .mapNotNull { encoded ->
-                runCatching {
-                    val decoded = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                    val fields = decoded.split(PROFILE_FIELD_SEPARATOR)
-                    val name = fields.firstOrNull()?.trim().orEmpty()
-                    val targets = fields.drop(1).mapNotNull { target ->
-                        val parts = target.split(TARGET_FIELD_SEPARATOR, limit = 2)
-                        if (parts.size == 2 && parts.all(String::isNotBlank)) {
-                            InstallTarget(parts[0], parts[1])
-                        } else {
-                            null
-                        }
-                    }
-                    ToolchainProfile(name, targets).takeIf { name.isNotEmpty() && targets.isNotEmpty() }
-                }.getOrNull()
-            }
-            .toList()
-
-    private fun List<ToolchainProfile>.encodeProfiles(): String =
-        asSequence()
-            .filter { it.name.isNotBlank() && it.targets.isNotEmpty() }
-            .map { profile ->
-                buildList {
-                    add(profile.name.trim())
-                    addAll(profile.targets.map { "${it.candidate}$TARGET_FIELD_SEPARATOR${it.version}" })
-                }.joinToString(PROFILE_FIELD_SEPARATOR.toString())
-            }
-            .map { PROFILE_ENCODER.encodeToString(it.toByteArray(StandardCharsets.UTF_8)) }
-            .joinToString("\n")
-
-    private fun Preferences.projectWorkspaces(key: String): List<ProjectWorkspaceReference> =
-        get(key, "")
-            .lineSequence()
-            .mapNotNull { encoded ->
-                runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR, limit = 2)
-                    if (fields.size != 2) return@runCatching null
-                    ProjectWorkspaceReference(fields[0], fields[1])
-                }.getOrNull()
-            }
-            .distinctBy(ProjectWorkspaceReference::sdkmanRcPath)
-            .toList()
-
-    private fun List<ProjectWorkspaceReference>.encodeProjectWorkspaces(): String =
-        asSequence()
-            .distinctBy(ProjectWorkspaceReference::sdkmanRcPath)
-            .sortedBy { it.displayName.lowercase() }
-            .map { "${it.sdkmanRcPath}$PROFILE_FIELD_SEPARATOR${it.displayName}" }
-            .map { PROFILE_ENCODER.encodeToString(it.toByteArray(StandardCharsets.UTF_8)) }
-            .joinToString("\n")
-
-    private fun Preferences.desiredToolchainState(): DesiredToolchainState? {
-        val chunks = getInt(DESIRED_STATE_CHUNK_COUNT_KEY, 0)
-        if (chunks !in 1..MAX_DESIRED_STATE_CHUNKS) return null
-        val encoded = buildString {
-            repeat(chunks) { index ->
-                append(get("$DESIRED_STATE_CHUNK_PREFIX$index", ""))
-            }
-        }
-        if (encoded.isEmpty()) return null
-        return runCatching {
-            val content = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-            val lines = content.lineSequence().filter(String::isNotBlank).toList()
-            val header = lines.first().split(PROFILE_FIELD_SEPARATOR)
-            require(header.size == 3)
-            val candidates = lines.drop(1).map { line ->
-                val fields = line.split(PROFILE_FIELD_SEPARATOR)
-                require(fields.size == 3)
-                DesiredCandidateState(
-                    candidate = fields[0],
-                    defaultVersion = fields[1].ifEmpty { null },
-                    installedVersions = fields[2].split(',').filter(String::isNotBlank),
-                )
-            }
-            DesiredToolchainState(
-                schemaVersion = header[0].toInt(),
-                sourceKind = DesiredStateSourceKind.valueOf(header[1]),
-                sourceLabel = header[2],
-                candidates = candidates,
-            )
-        }.getOrNull()
-    }
-
-    private fun Preferences.saveDesiredToolchainState(state: DesiredToolchainState?) {
-        val previousChunks = getInt(DESIRED_STATE_CHUNK_COUNT_KEY, 0)
-        if (state == null) {
-            repeat(previousChunks.coerceAtLeast(0)) { index ->
-                remove("$DESIRED_STATE_CHUNK_PREFIX$index")
-            }
-            remove(DESIRED_STATE_CHUNK_COUNT_KEY)
-            return
-        }
-        val content = buildString {
-            appendLine(
-                listOf(
-                    state.schemaVersion.toString(),
-                    state.sourceKind.name,
-                    state.sourceLabel,
-                ).joinToString(PROFILE_FIELD_SEPARATOR.toString()),
-            )
-            state.candidates.forEach { candidate ->
-                appendLine(
-                    listOf(
-                        candidate.candidate,
-                        candidate.defaultVersion.orEmpty(),
-                        candidate.installedVersions.joinToString(","),
-                    ).joinToString(PROFILE_FIELD_SEPARATOR.toString()),
-                )
-            }
-        }
-        val encoded = PROFILE_ENCODER.encodeToString(content.toByteArray(StandardCharsets.UTF_8))
-        val chunks = encoded.chunked(DESIRED_STATE_CHUNK_SIZE)
-        require(chunks.size <= MAX_DESIRED_STATE_CHUNKS) { "Desired toolchain state is too large to persist." }
-        chunks.forEachIndexed { index, chunk ->
-            put("$DESIRED_STATE_CHUNK_PREFIX$index", chunk)
-        }
-        for (index in chunks.size until previousChunks) {
-            remove("$DESIRED_STATE_CHUNK_PREFIX$index")
-        }
-        putInt(DESIRED_STATE_CHUNK_COUNT_KEY, chunks.size)
-    }
-
-    private fun Preferences.savedJdkFilters(key: String): List<SavedJdkFilter> =
-        get(key, "")
-            .lineSequence()
-            .mapNotNull { encoded ->
-                runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR)
-                    if (fields.size != 5) return@runCatching null
-                    SavedJdkFilter(
-                        name = fields[0],
-                        query = fields[1],
-                        status = fields[2],
-                        providerCode = fields[3].ifEmpty { null },
-                        sort = fields[4],
-                    ).takeIf { it.name.isNotBlank() }
-                }.getOrNull()
-            }
-            .toList()
-
-    private fun List<SavedJdkFilter>.encodeSavedJdkFilters(): String =
-        asSequence()
-            .filter { it.name.isNotBlank() }
-            .map { filter ->
-                listOf(
-                    filter.name.trim(),
-                    filter.query,
-                    filter.status,
-                    filter.providerCode.orEmpty(),
-                    filter.sort,
-                ).joinToString(PROFILE_FIELD_SEPARATOR.toString())
-            }
-            .map { PROFILE_ENCODER.encodeToString(it.toByteArray(StandardCharsets.UTF_8)) }
-            .joinToString("\n")
-
-    private fun Preferences.localOnlyObservations(key: String): List<LocalOnlyObservation> =
-        get(key, "")
-            .lineSequence()
-            .mapNotNull { encoded ->
-                runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR)
-                    if (fields.size != 3) return@runCatching null
-                    LocalOnlyObservation(
-                        candidate = fields[0],
-                        version = fields[1],
-                        firstSeenEpochMillis = fields[2].toLong(),
-                    ).takeIf {
-                        it.candidate.isNotBlank() &&
-                            it.version.isNotBlank() &&
-                            it.firstSeenEpochMillis >= 0
-                    }
-                }.getOrNull()
-            }
-            .toList()
-
-    private fun List<LocalOnlyObservation>.encodeLocalOnlyObservations(): String =
-        asSequence()
-            .filter {
-                it.candidate.isNotBlank() &&
-                    it.version.isNotBlank() &&
-                    it.firstSeenEpochMillis >= 0
-            }
-            .sortedWith(compareBy(LocalOnlyObservation::candidate, LocalOnlyObservation::version))
-            .map {
-                listOf(
-                    it.candidate,
-                    it.version,
-                    it.firstSeenEpochMillis.toString(),
-                ).joinToString(PROFILE_FIELD_SEPARATOR.toString())
-            }
-            .map { PROFILE_ENCODER.encodeToString(it.toByteArray(StandardCharsets.UTF_8)) }
-            .joinToString("\n")
-
-    private companion object {
-        const val THEME_KEY = "theme"
-        const val DENSITY_KEY = "density"
-        const val TEXT_SCALE_KEY = "text-scale"
-        const val MOTION_KEY = "motion"
-        const val REFRESH_SCHEDULE_KEY = "metadata-refresh-schedule"
-        const val NOTIFICATION_POLICY_KEY = "update-notification-policy"
-        const val OPERATION_NOTIFICATION_POLICY_KEY = "operation-notification-policy"
-        const val CLEANUP_GRACE_KEY = "cleanup-grace"
-        const val LOCAL_ONLY_OBSERVATIONS_KEY = "local-only-observations"
-        const val SHOW_SDKMAN_HOME_KEY = "show-sdkman-home"
-        const val FAVORITE_CANDIDATES_KEY = "favorite-candidates"
-        const val FAVORITE_JDK_VENDORS_KEY = "favorite-jdk-vendors"
-        const val RECENT_CANDIDATES_KEY = "recent-candidates"
-        const val PROFILES_KEY = "toolchain-profiles"
-        const val PROJECT_WORKSPACES_KEY = "project-workspaces"
-        const val DESIRED_STATE_CHUNK_COUNT_KEY = "desired-state-chunks"
-        const val DESIRED_STATE_CHUNK_PREFIX = "desired-state-"
-        const val DESIRED_STATE_CHUNK_SIZE = 3_000
-        const val MAX_DESIRED_STATE_CHUNKS = 128
-        const val NAVIGATION_WIDTH_KEY = "navigation-width-dp"
-        const val INSTALLED_VIEW_MODE_KEY = "installed-view-mode"
-        const val CATALOG_VIEW_MODE_KEY = "catalog-view-mode"
-        const val SAVED_JDK_FILTERS_KEY = "saved-jdk-filters"
-        const val PROFILE_FIELD_SEPARATOR = '\u001F'
-        const val TARGET_FIELD_SEPARATOR = '\u001E'
-        val PROFILE_ENCODER: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
-        val PROFILE_DECODER: Base64.Decoder = Base64.getUrlDecoder()
-    }
+    private fun readValidated(): AppSettings = persistence.readSnapshot()?.let(AppSettingsCodec::decode)
+        ?: LegacySettingsCodec.decode(persistence.readLegacyValues())
 }
 
 actual fun createAppSettingsRepository(): AppSettingsRepository = JvmAppSettingsRepository()

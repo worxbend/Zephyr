@@ -65,7 +65,6 @@ import com.worxbend.zephyr.domain.BatchItemStatus
 import com.worxbend.zephyr.domain.OperationStatus
 import com.worxbend.zephyr.domain.ActivityAction
 import com.worxbend.zephyr.domain.ActivitySeverity
-import com.worxbend.zephyr.data.createClipboardService
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import org.jetbrains.compose.resources.painterResource
 import zephyr.shared.generated.resources.Res
@@ -180,7 +179,7 @@ internal fun CopyTextButton(
     label: String = "Copy",
     modifier: Modifier = Modifier,
 ) {
-    val clipboard = remember { createClipboardService() }
+    val clipboard = LocalAppServices.current.clipboardService
     var result by remember(text) { mutableStateOf<Boolean?>(null) }
     TextButton(
         onClick = {

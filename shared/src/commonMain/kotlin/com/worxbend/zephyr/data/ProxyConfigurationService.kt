@@ -6,11 +6,20 @@ data class ProxyConfiguration(
     val port: Int = 8080,
     val username: String = "",
     val hasStoredPassword: Boolean = false,
+    val credentialStatus: ProxyCredentialStatus = if (hasStoredPassword) ProxyCredentialStatus.Found else ProxyCredentialStatus.Missing,
+    /** Includes obsolete identity-bound or legacy unbound entries awaiting verified deletion. */
+    val pendingCredentialCleanup: Boolean = false,
 )
+
+enum class ProxyCredentialStatus { Found, Missing, Unavailable, Failed }
 
 data class ProxySaveResult(
     val success: Boolean,
     val message: String,
+    /** False success with settingsSaved means configuration committed but secret cleanup failed. */
+    val settingsSaved: Boolean = success,
+    /** A secret or settings write may have applied; retry/reload rather than assuming rollback. */
+    val recoveryRequired: Boolean = false,
 )
 
 interface ProxyConfigurationService {

@@ -25,6 +25,7 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.compose.uiTest)
+            implementation(libs.kotlinx.coroutinesTest)
         }
         jvmMain.dependencies {
             implementation(libs.commons.exec)
@@ -32,5 +33,17 @@ kotlin {
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
         }
+    }
+}
+
+// Tests must never consult or mutate the developer's ambient preference tree.
+tasks.withType<Test>().configureEach {
+    val fixtureRoot = layout.buildDirectory.dir("test-fixtures").get().asFile
+    val preferencesRoot = layout.buildDirectory.dir("test-preferences").get().asFile
+    systemProperty("java.util.prefs.userRoot", preferencesRoot.absolutePath)
+    systemProperty("java.io.tmpdir", fixtureRoot.absolutePath)
+    doFirst {
+        fixtureRoot.mkdirs()
+        preferencesRoot.mkdirs()
     }
 }

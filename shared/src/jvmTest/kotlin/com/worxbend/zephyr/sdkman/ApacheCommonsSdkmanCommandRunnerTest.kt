@@ -2,7 +2,6 @@ package com.worxbend.zephyr.sdkman
 
 import com.worxbend.zephyr.domain.ConnectivityOutcome
 import com.worxbend.zephyr.domain.ConnectivityRouteKind
-import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -72,6 +71,24 @@ class ApacheCommonsSdkmanCommandRunnerTest {
     }
 
     @Test
+    fun deadlineIncludesChildrenHoldingInheritedOutputPipes() = runBlocking {
+        withFakeSdkmanHome("""
+            sdk() {
+                sleep 2 &
+                wait
+            }
+        """) { home ->
+            val started = System.nanoTime()
+            val result = ApacheCommonsSdkmanCommandRunner(home).run(
+                SdkmanCommand.Version, kotlin.time.Duration.parse("100ms"),
+            )
+            val elapsedMillis = (System.nanoTime() - started) / 1_000_000
+            assertTrue(result.timedOut)
+            assertTrue(elapsedMillis < 1_000, "Cleanup exceeded its bound: $elapsedMillis ms")
+        }
+    }
+
+    @Test
     fun diagnosticsNormalizeEverySupportedProxyKeyWithoutPuttingCredentialsInArgv() = runBlocking {
         listOf("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy").forEach { proxyKey ->
             withFakeSdkmanHome("""
@@ -136,7 +153,7 @@ class ApacheCommonsSdkmanCommandRunnerTest {
     }
 
     private suspend fun withFakeSdkmanHome(script: String, block: suspend (Path) -> Unit) {
-        val home = Files.createTempDirectory("zephyr-runner-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-runner-test-").toString().toPath()
         try {
             FileSystem.SYSTEM.createDirectories(home / "bin")
             FileSystem.SYSTEM.write(home / "bin" / "sdkman-init.sh") { writeUtf8(script.trimIndent()) }

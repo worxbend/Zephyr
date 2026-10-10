@@ -22,8 +22,48 @@ import kotlin.test.assertTrue
 
 class JvmDiagnosticsExporterTest {
     @Test
+    fun redactsBoundaryPathsInSupportIntegrityAndOperationFields() = runBlocking {
+        val directory = operationTestDirectory("zephyr-boundary-support-")
+        try {
+            val snapshot = DiagnosticsSnapshot(
+                generatedAtEpochMillis = 100,
+                sdkmanStatus = SdkmanStatus(true, "/synthetic/sdkman", "SDKMAN 5.20"),
+                connectivityStatus = ConnectivityStatus.from(
+                    ConnectivityDiagnostic(ConnectivityRouteKind.Direct, 100, 42, ConnectivityOutcome.Online),
+                ),
+                integrityChecks = sensitivePathBoundaryFixtures.map { path ->
+                    IntegrityCheck(IntegrityCheckId.RequiredScripts, "Scripts $path; check", IntegrityStatus.Failed, "Failure $path; retry.")
+                },
+                installedCandidates = 1,
+                installedVersions = 1,
+                localOnlyVersions = 0,
+                protectedVersions = 0,
+                journal = sensitivePathBoundaryFixtures.mapIndexed { index, path ->
+                    OperationJournalEntry(
+                        index + 1L,
+                        SdkmanTransaction.ToolchainActivation(
+                            "Profile $path; activation",
+                            listOf(com.worxbend.zephyr.domain.PlannedSdkmanCommand(com.worxbend.zephyr.domain.SdkmanCommandAction.Install, "java", "21-tem")),
+                        ),
+                        100,
+                        outcome = "Failure $path; retry. See https://example.test/docs?next=/public/project",
+                    )
+                },
+            )
+            val result = JvmDiagnosticsExporter({ directory }, { 100 }, { emptyList() }).export(snapshot)
+            val report = java.nio.file.Path.of(result.path).readText()
+            assertFalse(report.contains("customer-private"), report)
+            assertFalse(report.contains("Reilly"), report)
+            assertTrue(report.contains("<redacted-path>"), report)
+            assertTrue(report.contains("Session operations"), report)
+            assertTrue(report.contains("Activate"), report)
+            assertTrue(report.contains("https://example.test/docs?next=/public/project"), report)
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
     fun exportsStructuredDiagnosticsWithSensitivePathsRedacted() = runBlocking {
-        val directory = Files.createTempDirectory("zephyr-support-test-")
+        val directory = operationTestDirectory("zephyr-support-test-")
         try {
             val exporter = JvmDiagnosticsExporter(
                 outputDirectory = { directory },
@@ -48,9 +88,9 @@ class JvmDiagnosticsExporterTest {
                 integrityChecks = listOf(
                     IntegrityCheck(
                         IntegrityCheckId.RequiredScripts,
-                        "Required scripts",
+                        "Required scripts at /srv/secret-title/build",
                         IntegrityStatus.Passed,
-                        "Scripts under /opt/custom-sdkman are present.",
+                        "Scripts under /opt/custom-sdkman are present; C:\\Customers\\secret-detail\\scripts.",
                     ),
                 ),
                 installedCandidates = 2,
@@ -80,6 +120,8 @@ class JvmDiagnosticsExporterTest {
             assertTrue(report.contains("<redacted-path>"))
             assertFalse(report.contains("/home/alice"))
             assertFalse(report.contains("/opt/custom-sdkman"))
+            assertFalse(report.contains("secret-title"))
+            assertFalse(report.contains("secret-detail"))
         } finally {
             directory.toFile().deleteRecursively()
         }

@@ -19,7 +19,7 @@ import kotlinx.coroutines.runBlocking
 class JvmOperationStoreTest {
     @Test
     fun roundTripsTypedStableUpdateActivation() = runBlocking {
-        val directory = Files.createTempDirectory("zephyr-update-task-store-")
+        val directory = operationTestDirectory("zephyr-update-task-store-")
         try {
             val destination = directory.resolve("tasks.ledger")
             val transaction = SdkmanTransaction.UpdateActivation(
@@ -30,7 +30,7 @@ class JvmOperationStoreTest {
             )
             val entry = OperationJournalEntry(52, transaction, 400)
 
-            JvmOperationStore(destination).also { store ->
+            JvmOperationStore(destination, sensitivePaths = { emptyList() }).also { store ->
                 store.save(listOf(entry))
                 assertEquals(entry, store.load().single())
             }
@@ -42,7 +42,7 @@ class JvmOperationStoreTest {
 
     @Test
     fun roundTripsProfileActivationIdentityAndTypedPlan() = runBlocking {
-        val directory = Files.createTempDirectory("zephyr-profile-task-store-")
+        val directory = operationTestDirectory("zephyr-profile-task-store-")
         try {
             val destination = directory.resolve("tasks.ledger")
             val transaction = SdkmanTransaction.ToolchainActivation(
@@ -58,7 +58,7 @@ class JvmOperationStoreTest {
                 startedAtEpochMillis = 300,
             )
 
-            JvmOperationStore(destination).also { store ->
+            JvmOperationStore(destination, sensitivePaths = { emptyList() }).also { store ->
                 store.save(listOf(entry))
                 assertEquals(entry, store.load().single())
             }
@@ -70,7 +70,7 @@ class JvmOperationStoreTest {
 
     @Test
     fun roundTripsTypedStepsAndStatuses() = runBlocking {
-        val directory = Files.createTempDirectory("zephyr-task-store-")
+        val directory = operationTestDirectory("zephyr-task-store-")
         try {
             val destination = directory.resolve("tasks.ledger")
             val transaction = SdkmanTransaction.BatchInstall(
@@ -95,7 +95,7 @@ class JvmOperationStoreTest {
                     )
                 },
             )
-            val store = JvmOperationStore(destination)
+            val store = JvmOperationStore(destination, sensitivePaths = { emptyList() })
 
             store.save(listOf(entry))
             val restored = store.load().single()
@@ -108,7 +108,7 @@ class JvmOperationStoreTest {
 
     @Test
     fun redactsPathsAndBoundsRetention() = runBlocking {
-        val directory = Files.createTempDirectory("zephyr-task-store-")
+        val directory = operationTestDirectory("zephyr-task-store-")
         try {
             val destination = directory.resolve("tasks.ledger")
             val secretHome = "/private/example/sdkman"
@@ -137,6 +137,93 @@ class JvmOperationStoreTest {
         } finally {
             directory.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun malformedPendingRecordRejectsWholeLedgerAndPreservesOriginalOnSave() = runBlocking {
+        val directory = operationTestDirectory("zephyr-corrupt-ledger-")
+        try {
+            val destination = directory.resolve("tasks.ledger")
+            val entry = OperationJournalEntry(
+                1, SdkmanTransaction.BatchInstall(listOf(InstallTarget("java", "21-tem"), InstallTarget("gradle", "9.0"))), 100,
+            )
+            val damaged = renderOperationLedger(listOf(entry)).lineSequence()
+                .map { if (it.startsWith("S\t1\t1\t")) "S\t1\t1\tBROKEN" else it }
+                .joinToString("\n")
+            Files.writeString(destination, damaged)
+            val store = JvmOperationStore(destination, sensitivePaths = { emptyList() })
+            kotlin.test.assertFailsWith<IllegalArgumentException> { store.load() }
+            kotlin.test.assertFailsWith<IllegalArgumentException> { store.save(emptyList()) }
+            assertEquals(damaged, Files.readString(destination))
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unsupportedLedgerBlocksEvenAFreshStoreSaveWithoutLoad() = runBlocking {
+        val directory = operationTestDirectory("zephyr-unsupported-")
+        try {
+            val path = directory.resolve("tasks.ledger")
+            val original = "ZEPHYR_TASK_CENTER\t99\n"
+            Files.writeString(path, original)
+            val store = JvmOperationStore(path, sensitivePaths = { emptyList() })
+            kotlin.test.assertFailsWith<UnsupportedOperationLedgerException> { store.save(emptyList()) }
+            assertEquals(original, Files.readString(path))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun missingIsEmptyButDirectoryAndSymlinkAreReadFailures() = runBlocking {
+        val directory = operationTestDirectory("zephyr-read-failure-")
+        try {
+            val path = directory.resolve("tasks.ledger")
+            assertEquals(emptyList(), JvmOperationStore(path).load())
+            Files.createDirectory(path)
+            val store = JvmOperationStore(path, sensitivePaths = { emptyList() })
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { store.load() }
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { store.save(emptyList()) }
+            assertTrue(Files.isDirectory(path))
+            Files.delete(path)
+            val external = directory.resolve("external")
+            Files.writeString(external, "external fixture")
+            Files.createSymbolicLink(path, external)
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { JvmOperationStore(path).load() }
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { JvmOperationStore(path).save(emptyList()) }
+            assertEquals("external fixture", Files.readString(external))
+            assertTrue(Files.isSymbolicLink(path))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun revalidatesOriginalAfterLoadAndKeepsFailureSticky() = runBlocking {
+        val directory = operationTestDirectory("zephyr-revalidation-")
+        try {
+            val path = directory.resolve("tasks.ledger")
+            val store = JvmOperationStore(path, sensitivePaths = { emptyList() })
+            store.save(emptyList())
+            assertEquals(emptyList(), store.load())
+            Files.writeString(path, "broken original")
+            kotlin.test.assertFailsWith<CorruptOperationLedgerException> { store.save(emptyList()) }
+            assertEquals("broken original", Files.readString(path))
+            Files.delete(path)
+            kotlin.test.assertFailsWith<CorruptOperationLedgerException> { store.save(emptyList()) }
+            assertFalse(Files.exists(path))
+        } finally { directory.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun malformedUtf8IsAReadFailureAndBytesRemainIntact() = runBlocking {
+        val directory = operationTestDirectory("zephyr-invalid-utf8-")
+        try {
+            val path = directory.resolve("tasks.ledger")
+            val bytes = byteArrayOf(0xc3.toByte(), 0x28)
+            Files.write(path, bytes)
+            val store = JvmOperationStore(path)
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { store.load() }
+            kotlin.test.assertFailsWith<UnreadableOperationLedgerException> { store.save(emptyList()) }
+            kotlin.test.assertContentEquals(bytes, Files.readAllBytes(path))
+        } finally { directory.toFile().deleteRecursively() }
     }
 
     @Test

@@ -17,9 +17,6 @@ import com.worxbend.zephyr.domain.StorageCleanupDisposition
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-import java.nio.file.Files
-import java.util.UUID
-import java.util.prefs.Preferences
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,7 +29,7 @@ import kotlinx.coroutines.runBlocking
 class JvmSdkmanRepositoryTest {
     @Test
     fun measuresLogicalPayloadAndRejectsSymlinksInsteadOfFollowingOrSkippingThem() {
-        val root = Files.createTempDirectory("zephyr-storage-test-").toString().toPath()
+        val root = sdkmanTestDirectory("zephyr-storage-test-").toString().toPath()
         try {
             val fileSystem = FileSystem.SYSTEM
             fileSystem.createDirectories(root / "nested")
@@ -53,7 +50,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun marksPayloadUnknownWhenSafeTraversalCapIsExceeded() {
-        val root = Files.createTempDirectory("zephyr-storage-cap-test-").toString().toPath()
+        val root = sdkmanTestDirectory("zephyr-storage-cap-test-").toString().toPath()
         try {
             FileSystem.SYSTEM.write(root / "one.bin") { writeByte(1) }
             FileSystem.SYSTEM.write(root / "two.bin") { writeByte(2) }
@@ -69,7 +66,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun storageInventoryPreservesDefaultProtectionAndRemoteEvidence() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-storage-inventory-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-storage-inventory-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val protected = ProtectedVersion("java", "17.0.1-tem")
@@ -120,20 +117,23 @@ class JvmSdkmanRepositoryTest {
     @Test
     fun invalidatesTheCatalogAfterMetadataRefresh() = runBlocking {
         val runner = RecordingRunner()
-        val repository = JvmSdkmanRepository(FileSystem.SYSTEM) { runner }
-
-        repository.catalog(refreshMetadata = false)
-        repository.catalog(refreshMetadata = false)
-        repository.refreshCandidateMetadata()
-        repository.catalog(refreshMetadata = false)
-
-        assertEquals(2, runner.commands.count { it == SdkmanCommand.ListCandidates })
-        assertEquals(1, runner.commands.count { it == SdkmanCommand.UpdateCandidateMetadata })
+        val home = sdkmanTestDirectory("zephyr-catalog-refresh-").toString().toPath()
+        try {
+            val repository = JvmSdkmanRepository(FileSystem.SYSTEM, { home }) { runner }
+            repository.catalog(refreshMetadata = false)
+            repository.catalog(refreshMetadata = false)
+            repository.refreshCandidateMetadata()
+            repository.catalog(refreshMetadata = false)
+            assertEquals(2, runner.commands.count { it == SdkmanCommand.ListCandidates })
+            assertEquals(1, runner.commands.count { it == SdkmanCommand.UpdateCandidateMetadata })
+        } finally {
+            FileSystem.SYSTEM.deleteRecursively(home)
+        }
     }
 
     @Test
     fun acceptsStandardSdkmanIdentifiers() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home)
@@ -151,7 +151,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun mergesFilesystemVersionsAndProtectsTheDefaultVersionDuringCleanup() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home)
@@ -175,7 +175,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun ignoresMalformedOrSymlinkedSdkmanEntriesDuringFilesystemDiscovery() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val fileSystem = FileSystem.SYSTEM
@@ -199,7 +199,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun cleansOnlyVersionsVerifiedAsLocalOnly() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home)
@@ -219,7 +219,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun estimatesExactCleanupAndMedianInstallDiskImpact() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val fileSystem = FileSystem.SYSTEM
@@ -252,7 +252,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun repositoryBoundaryBlocksProtectedCleanupAndUninstall() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val protected = ProtectedVersion("java", "17.0.1-tem")
@@ -282,7 +282,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun repositoryBoundaryBlocksDefaultUninstall() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner()
@@ -300,20 +300,13 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun protectedVersionsPersistAcrossStoreInstances() {
-        val preferences = Preferences.userRoot().node("/com/worxbend/zephyr/test/${UUID.randomUUID()}")
-        try {
-            val protected = setOf(
-                ProtectedVersion("java", "21.0.5-tem"),
-                ProtectedVersion("gradle", "9.0.0"),
-            )
-
-            PreferencesProtectedVersionStore(preferences).save(protected)
-
-            assertEquals(protected, PreferencesProtectedVersionStore(preferences).load())
-        } finally {
-            preferences.removeNode()
-            Preferences.userRoot().flush()
-        }
+        val preferences = SdkmanMemoryPreferences()
+        val protected = setOf(
+            ProtectedVersion("java", "21.0.5-tem"),
+            ProtectedVersion("gradle", "9.0.0"),
+        )
+        PreferencesProtectedVersionStore(preferences).save(protected)
+        assertEquals(protected, PreferencesProtectedVersionStore(preferences).load())
     }
 
     @Test
@@ -374,7 +367,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun reportsIntegrityBoundariesIndependentlyAndRejectsEscapingCurrentLinks() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val fileSystem = FileSystem.SYSTEM
@@ -409,7 +402,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun refusesCleanupWhenRemoteVersionsCannotBeVerified() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = FailingVersionsRunner()
@@ -428,7 +421,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun blocksCleanupWhenVersionOutputIsOnlyPartiallyParsed() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = object : SdkmanCommandRunner {
@@ -459,7 +452,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun doesNotTrustSuccessfulExitWithoutInstallPostcondition() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home, applyMutations = false)
@@ -477,7 +470,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun reportsAppliedWithWarningWhenFilesystemChangedDespiteNonzeroExit() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home, mutationExitCode = 7)
@@ -495,7 +488,7 @@ class JvmSdkmanRepositoryTest {
 
     @Test
     fun verifiesDefaultAndUninstallPostconditions() = runBlocking {
-        val home = Files.createTempDirectory("zephyr-sdkman-test-").toString().toPath()
+        val home = sdkmanTestDirectory("zephyr-sdkman-test-").toString().toPath()
         try {
             createSdkmanHome(home)
             val runner = RecordingRunner(home)

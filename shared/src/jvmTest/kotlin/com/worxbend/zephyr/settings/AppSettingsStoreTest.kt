@@ -66,8 +66,7 @@ class AppSettingsStoreTest {
 
     @Test
     fun jvmRepositoryPersistsFavoriteSets() = runBlocking {
-        val preferences = java.util.prefs.Preferences.userRoot()
-            .node("/com/worxbend/zephyr/tests/favorites-${System.nanoTime()}")
+        val preferences = MemorySettingsPreferences().node("fixture")
         try {
             val repository = JvmAppSettingsRepository(preferences)
             val expected = AppSettings(

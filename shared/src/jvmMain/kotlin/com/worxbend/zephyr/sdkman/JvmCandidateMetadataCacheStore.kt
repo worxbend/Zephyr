@@ -7,7 +7,12 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.nio.file.StandardCopyOption
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.channels.FileChannel
+import com.worxbend.zephyr.logging.ZephyrLogger
 import java.util.Base64
+import kotlinx.coroutines.CancellationException
 
 interface CandidateMetadataCacheStore {
     fun load(): CandidateMetadataCache?
@@ -21,23 +26,53 @@ object NoOpCandidateMetadataCacheStore : CandidateMetadataCacheStore {
 
 internal class JvmCandidateMetadataCacheStore(
     private val path: Path = defaultCandidateCachePath(),
+    private val replace: (Path, Path) -> Unit = { temporary, destination ->
+        Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    },
     private val clock: () -> Long = System::currentTimeMillis,
 ) : CandidateMetadataCacheStore {
     override fun load(): CandidateMetadataCache? = runCatching {
-        if (!Files.isRegularFile(path)) return null
-        parseCandidateCache(Files.readString(path))
+        val destination = path.toAbsolutePath().normalize()
+        validateCacheParent(destination.parent, create = false)
+        if (!Files.isRegularFile(destination, NOFOLLOW_LINKS)) return null
+        Files.newByteChannel(destination, setOf(StandardOpenOption.READ, NOFOLLOW_LINKS)).use { channel ->
+            parseCandidateCache(java.nio.channels.Channels.newInputStream(channel).readBytes().toString(StandardCharsets.UTF_8))
+        }
     }.getOrNull()
 
     override fun save(items: List<CandidateCatalogItem>) {
-        runCatching {
-            path.parent?.let(Files::createDirectories)
-            Files.writeString(
-                path,
-                renderCandidateCache(CandidateMetadataCache(clock(), items)),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE,
-            )
+        var temporary: Path? = null
+        try {
+            val destination = path.toAbsolutePath().normalize()
+            validateCacheParent(destination.parent, create = true)
+            temporary = Files.createTempFile(destination.parent, ".zephyr-catalog-", ".tmp")
+            val content = renderCandidateCache(CandidateMetadataCache(clock(), items)).toByteArray(StandardCharsets.UTF_8)
+            FileChannel.open(temporary, StandardOpenOption.WRITE, NOFOLLOW_LINKS).use { channel ->
+                val bytes = java.nio.ByteBuffer.wrap(content)
+                while (bytes.hasRemaining()) channel.write(bytes)
+                channel.force(true)
+            }
+            validateCacheParent(destination.parent, create = false)
+            // Replace the directory entry itself, never open/truncate its target.
+            // No non-atomic fallback: unsupported/failed replacement keeps old data.
+            replace(temporary, destination)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            ZephyrLogger.warn("Candidate metadata cache could not be safely replaced; previous cache retained.")
+        } finally {
+            temporary?.let { runCatching { Files.deleteIfExists(it) } }
+        }
+    }
+}
+
+private fun validateCacheParent(parent: Path, create: Boolean) {
+    var current = parent.root
+    for (component in parent) {
+        current = current.resolve(component)
+        if (create && !Files.exists(current, NOFOLLOW_LINKS)) Files.createDirectory(current)
+        require(Files.isDirectory(current, NOFOLLOW_LINKS) && !Files.isSymbolicLink(current)) {
+            "Unsafe cache directory."
         }
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -203,18 +204,21 @@ class ZephyrUiPrimitivesTest {
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun settingsScreenPublishesAppearanceChanges() = runComposeUiTest {
+        val services = MemoryRouteServices().services
         setContent {
-            ZephyrTheme(darkTheme = false) {
-                var settings by remember { mutableStateOf(AppSettings()) }
-                Box {
-                    SettingsScreen(
-                        settings = settings,
-                        onSettingsChange = { transform -> settings = transform(settings) },
-                    )
-                    Text(
-                        "${settings.themePreference}:${settings.uiDensity}:${settings.textScale}:${settings.motionPreference}:${settings.metadataRefreshSchedule}:${settings.updateNotificationPolicy}:${settings.operationNotificationPolicy}:${settings.cleanupGracePeriod}",
-                        modifier = Modifier.testTag("appearance-settings"),
-                    )
+            CompositionLocalProvider(LocalAppServices provides services) {
+                ZephyrTheme(darkTheme = false) {
+                    var settings by remember { mutableStateOf(AppSettings()) }
+                    Box {
+                        SettingsScreen(
+                            settings = settings,
+                            onSettingsChange = { transform -> settings = transform(settings) },
+                        )
+                        Text(
+                            "${settings.themePreference}:${settings.uiDensity}:${settings.textScale}:${settings.motionPreference}:${settings.metadataRefreshSchedule}:${settings.updateNotificationPolicy}:${settings.operationNotificationPolicy}:${settings.cleanupGracePeriod}",
+                            modifier = Modifier.testTag("appearance-settings"),
+                        )
+                    }
                 }
             }
         }
@@ -236,27 +240,30 @@ class ZephyrUiPrimitivesTest {
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun transactionPreviewShowsStructuredCommandsBeforeConfirmation() = runComposeUiTest {
+        val services = MemoryRouteServices().services
         setContent {
-            ZephyrTheme(darkTheme = false) {
-                var visible by remember { mutableStateOf(true) }
-                if (visible) {
-                    TransactionPreviewDialog(
-                        transaction = SdkmanTransaction.CleanLocalOnly(
-                            candidate = "java",
-                            versions = listOf("17.0.1-tem", "19.0.2-tem"),
-                        ),
-                        diskImpact = DiskImpactEstimate(
-                            kind = DiskImpactKind.Reclaimable,
-                            bytes = 4_096,
-                            availableBytes = 8_192,
-                            confidence = EstimateConfidence.Exact,
-                            explanation = "Calculated from two installed version directories.",
-                        ),
-                        onConfirm = { visible = false },
-                        onDismiss = { visible = false },
-                    )
+            CompositionLocalProvider(LocalAppServices provides services) {
+                ZephyrTheme(darkTheme = false) {
+                    var visible by remember { mutableStateOf(true) }
+                    if (visible) {
+                        TransactionPreviewDialog(
+                            transaction = SdkmanTransaction.CleanLocalOnly(
+                                candidate = "java",
+                                versions = listOf("17.0.1-tem", "19.0.2-tem"),
+                            ),
+                            diskImpact = DiskImpactEstimate(
+                                kind = DiskImpactKind.Reclaimable,
+                                bytes = 4_096,
+                                availableBytes = 8_192,
+                                confidence = EstimateConfidence.Exact,
+                                explanation = "Calculated from two installed version directories.",
+                            ),
+                            onConfirm = { visible = false },
+                            onDismiss = { visible = false },
+                        )
+                    }
+                    Text(if (visible) "pending" else "dismissed", Modifier.testTag("transaction-state"))
                 }
-                Text(if (visible) "pending" else "dismissed", Modifier.testTag("transaction-state"))
             }
         }
 

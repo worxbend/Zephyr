@@ -120,7 +120,13 @@ data class CommandOutcome(
     val success: Boolean,
     val message: String,
     val status: CommandOutcomeStatus = if (success) CommandOutcomeStatus.Applied else CommandOutcomeStatus.Failed,
-)
+) {
+    init {
+        val verifiedSuccess = status == CommandOutcomeStatus.Applied ||
+            status == CommandOutcomeStatus.AppliedWithWarning || status == CommandOutcomeStatus.AlreadySatisfied
+        require(success == verifiedSuccess) { "Command success must match its verification status." }
+    }
+}
 
 enum class CommandOutcomeStatus(val label: String) {
     Applied("Applied"),

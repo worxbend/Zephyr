@@ -114,6 +114,8 @@ internal fun ZephyrScreen(
     onSettingsChange: ((AppSettings) -> AppSettings) -> Unit,
     darkTheme: Boolean,
     onToggleTheme: () -> Unit,
+    settingsSaveStatus: com.worxbend.zephyr.settings.SettingsSaveStatus? = null,
+    onRetrySettingsSave: () -> Unit = {},
 ) {
     val metrics = LocalZephyrMetrics.current
     val defaultNavigationWidth = metrics.navigationWidth.value
@@ -271,6 +273,8 @@ internal fun ZephyrScreen(
                         onUninstall = { candidate, version ->
                             viewModel.requestTransaction(SdkmanTransaction.Uninstall(candidate, version))
                         },
+                        settingsSaveStatus = settingsSaveStatus,
+                        onRetrySettingsSave = onRetrySettingsSave,
                     )
                 }
                 if (shellLayout == ShellLayout.Narrow && navigationOverlayOpen) {

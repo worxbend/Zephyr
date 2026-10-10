@@ -27,12 +27,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.worxbend.zephyr.domain.Candidate
+import com.worxbend.zephyr.domain.cleanupEligibility
 import com.worxbend.zephyr.domain.CandidateCatalogItem
 import com.worxbend.zephyr.domain.CandidateKind
 import com.worxbend.zephyr.domain.JavaVersion
 import com.worxbend.zephyr.domain.ProtectedVersion
 import com.worxbend.zephyr.domain.javaProviderName
-import com.worxbend.zephyr.data.createClipboardService
 
 /** Keep record identity readable before allowing actions to wrap underneath it. */
 @Composable
@@ -74,7 +74,7 @@ internal fun CandidateGrid(
     candidates: List<Candidate>,
     protectedVersions: Set<ProtectedVersion> = emptySet(),
     reviewDueVersions: Set<ProtectedVersion> = emptySet(),
-    cleanupEligibleCandidates: Set<String>? = null,
+    cleanupVersionsByCandidate: Map<String, List<String>> = emptyMap(),
     onOpen: (Candidate) -> Unit,
     onClean: (String, List<String>) -> Unit,
 ) {
@@ -85,6 +85,7 @@ internal fun CandidateGrid(
         horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         items(candidates, key = { it.name }) { candidate ->
+            val eligibility = cleanupEligibility(candidate, protectedVersions, candidate.name in cleanupVersionsByCandidate)
             val protectedLocalOnly = candidate.localOnlyVersions.filter { version ->
                 ProtectedVersion(candidate.name, version) in protectedVersions
             }
@@ -95,10 +96,11 @@ internal fun CandidateGrid(
                 candidate = candidate,
                 protectedLocalOnlyCount = protectedLocalOnly.size,
                 reviewDueCount = reviewDueCount,
-                cleanupEvidenceTrusted = cleanupEligibleCandidates == null || candidate.name in cleanupEligibleCandidates,
+                cleanupEvidenceTrusted = candidate.name in cleanupVersionsByCandidate,
+                cleanableVersions = eligibility.eligibleVersions.filter { it in cleanupVersionsByCandidate[candidate.name].orEmpty() },
                 onClick = { onOpen(candidate) },
                 onClean = {
-                    onClean(candidate.name, candidate.localOnlyVersions - protectedLocalOnly.toSet())
+                    onClean(candidate.name, eligibility.eligibleVersions.filter { it in cleanupVersionsByCandidate[candidate.name].orEmpty() })
                 },
             )
         }
@@ -109,17 +111,16 @@ internal fun CandidateGrid(
 internal fun CandidateTable(
     candidates: List<Candidate>,
     protectedVersions: Set<ProtectedVersion> = emptySet(),
+    cleanupVersionsByCandidate: Map<String, List<String>> = emptyMap(),
     onOpen: (Candidate) -> Unit,
     onClean: (String, List<String>) -> Unit,
 ) {
     val spacing = LocalZephyrMetrics.current.spacing
-    val clipboard = remember { createClipboardService() }
+    val clipboard = LocalAppServices.current.clipboardService
     LazyColumn(verticalArrangement = Arrangement.spacedBy(spacing)) {
         items(candidates, key = Candidate::name) { candidate ->
-            val protectedLocalOnly = candidate.localOnlyVersions.filter { version ->
-                ProtectedVersion(candidate.name, version) in protectedVersions
-            }
-            val cleanable = candidate.localOnlyVersions - protectedLocalOnly.toSet()
+            val eligibility = cleanupEligibility(candidate, protectedVersions, candidate.name in cleanupVersionsByCandidate)
+            val cleanable = eligibility.eligibleVersions.filter { it in cleanupVersionsByCandidate[candidate.name].orEmpty() }
             ContextActionArea(
                 actions = buildList {
                     add(ContextAction("Inspect") { onOpen(candidate) })
@@ -175,7 +176,7 @@ internal fun PackageTable(
     onOpen: (CandidateCatalogItem) -> Unit,
 ) {
     val spacing = LocalZephyrMetrics.current.spacing
-    val clipboard = remember { createClipboardService() }
+    val clipboard = LocalAppServices.current.clipboardService
     LazyColumn(verticalArrangement = Arrangement.spacedBy(spacing)) {
         items(packages, key = CandidateCatalogItem::name) { item ->
             val favorite = item.name in favoriteCandidates
@@ -223,13 +224,14 @@ internal fun CandidateCard(
     candidate: Candidate,
     protectedLocalOnlyCount: Int,
     reviewDueCount: Int = 0,
-    cleanupEvidenceTrusted: Boolean = true,
+    cleanupEvidenceTrusted: Boolean = false,
+    cleanableVersions: List<String> = emptyList(),
     onClick: () -> Unit,
     onClean: () -> Unit,
 ) {
     val metrics = LocalZephyrMetrics.current
-    val clipboard = remember { createClipboardService() }
-    val cleanable = cleanupEvidenceTrusted && candidate.localOnlyVersionCount > protectedLocalOnlyCount
+    val clipboard = LocalAppServices.current.clipboardService
+    val cleanable = cleanupEvidenceTrusted && cleanableVersions.isNotEmpty()
     ContextActionArea(
         actions = buildList {
             add(ContextAction("Inspect") { onClick() })
@@ -275,7 +277,7 @@ internal fun CandidateCard(
                             }
                         } else if (cleanupEvidenceTrusted) {
                             Text(
-                                "All local-only versions are protected",
+                                "All local-only versions are default or protected",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -301,7 +303,7 @@ internal fun PackageCard(
     onClick: () -> Unit,
 ) {
     val metrics = LocalZephyrMetrics.current
-    val clipboard = remember { createClipboardService() }
+    val clipboard = LocalAppServices.current.clipboardService
     ContextActionArea(
         actions = buildList {
             add(ContextAction("Inspect") { onClick() })
@@ -356,9 +358,10 @@ internal fun JdkVersionCard(
     onToggleProtected: () -> Unit,
     onClean: () -> Unit,
     onOpenTerminal: (() -> Unit)? = null,
+    cleanupEligible: Boolean = false,
 ) {
     val metrics = LocalZephyrMetrics.current
-    val clipboard = remember { createClipboardService() }
+    val clipboard = LocalAppServices.current.clipboardService
     ContextActionArea(
         actions = buildList {
             add(ContextAction("Copy version") { clipboard.copy(version.identifier) })
@@ -366,7 +369,7 @@ internal fun JdkVersionCard(
                 add(ContextAction("Open activated terminal") { it() })
             }
             add(ContextAction(if (isProtected) "Unpin" else "Protect") { onToggleProtected() })
-            if (version.isConfirmedLocalOnly && version.identifier != default && !isProtected) {
+            if (cleanupEligible) {
                 add(ContextAction("Clean") { onClean() })
             }
         },
@@ -400,7 +403,7 @@ internal fun JdkVersionCard(
                     TextButton(onClick = onOpenTerminal) { Text("Terminal") }
                 }
                 TextButton(onClick = onToggleProtected) { Text(if (isProtected) "Unpin" else "Protect") }
-                if (version.isConfirmedLocalOnly && version.identifier != default && !isProtected) {
+                if (cleanupEligible) {
                     OutlinedButton(onClick = onClean) { Text("Clean") }
                 }
                 if (version.isConfirmedLocalOnly && version.identifier == default) {

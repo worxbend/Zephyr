@@ -59,7 +59,7 @@ class JvmSdkmanRepository(
         val candidates = home / "candidates"
         val missing = when {
             fileSystem.metadataOrNull(init) == null -> "Missing SDKMAN init script at $init."
-            fileSystem.metadataOrNull(candidates)?.isDirectory != true -> "Missing SDKMAN candidates directory at $candidates."
+            !inspector().safeRoot() -> "Missing SDKMAN candidates directory at $candidates."
             else -> null
         }
 
@@ -81,6 +81,7 @@ class JvmSdkmanRepository(
 
     override suspend fun installedCandidates(): List<Candidate> {
         val candidatesPath = home() / "candidates"
+        if (!inspector().safeRoot()) return emptyList()
         return fileSystem.listOrNull(candidatesPath).orEmpty()
             .mapNotNull { candidatePath ->
                 val metadata = fileSystem.metadataOrNull(candidatePath) ?: return@mapNotNull null
@@ -154,6 +155,7 @@ class JvmSdkmanRepository(
 
     override suspend fun mergedCandidate(candidate: String): Candidate? {
         validateCandidate(candidate)
+        check(inspector().safeCandidate(candidate)) { "Unsafe SDKMAN candidate directory." }
         val localVersions = installedVersionsFor(candidate)
         val default = defaultVersionFor(candidate)
         val report = versionReport(candidate)
@@ -232,7 +234,8 @@ class JvmSdkmanRepository(
                 !metadata.isDirectory && metadata.symlinkTarget == null
             } != true
         }
-        val candidateEntries = fileSystem.listOrNull(candidatesPath).orEmpty()
+        val safeCandidatesRoot = inspector().safeRoot()
+        val candidateEntries = if (safeCandidatesRoot) fileSystem.listOrNull(candidatesPath).orEmpty() else emptyList()
         val invalidCandidates = candidateEntries.filter { path ->
             val metadata = fileSystem.metadataOrNull(path)
             !isValidCandidate(path.name) || metadata?.isDirectory != true || metadata.symlinkTarget != null
@@ -268,12 +271,12 @@ class JvmSdkmanRepository(
             IntegrityCheck(
                 id = IntegrityCheckId.CandidatesDirectory,
                 title = "Candidates directory",
-                status = if (fileSystem.metadataOrNull(candidatesPath)?.isDirectory == true) {
+                status = if (safeCandidatesRoot) {
                     IntegrityStatus.Passed
                 } else {
                     IntegrityStatus.Failed
                 },
-                detail = if (fileSystem.metadataOrNull(candidatesPath)?.isDirectory == true) {
+                detail = if (safeCandidatesRoot) {
                     "The SDKMAN candidates directory is available."
                 } else {
                     "The SDKMAN candidates directory is missing or unreadable."
@@ -330,17 +333,17 @@ class JvmSdkmanRepository(
                 val estimates = transaction.targets.map { target ->
                     estimateDiskImpact(SdkmanTransaction.Install(target.candidate, target.version))
                 }
-                val knownBytes = estimates.mapNotNull { it.bytes }
+                val total = exactStorageSum(estimates.map { it.bytes })
                 DiskImpactEstimate(
-                    kind = if (knownBytes.size == estimates.size) DiskImpactKind.Required else DiskImpactKind.Unknown,
-                    bytes = knownBytes.takeIf { it.size == estimates.size }?.sum(),
+                    kind = if (total != null) DiskImpactKind.Required else DiskImpactKind.Unknown,
+                    bytes = total,
                     availableBytes = available,
-                    confidence = if (knownBytes.size == estimates.size) {
+                    confidence = if (total != null) {
                         EstimateConfidence.Estimated
                     } else {
                         EstimateConfidence.Unknown
                     },
-                    explanation = if (knownBytes.size == estimates.size) {
+                    explanation = if (total != null) {
                         "Combined estimate for ${transaction.targets.size} sequential installs."
                     } else {
                         "One or more selected candidates have no local sibling size evidence."
@@ -360,27 +363,27 @@ class JvmSdkmanRepository(
                         ),
                     )
                 }
-                val knownBytes = estimates.mapNotNull { it.bytes }
+                val total = exactStorageSum(estimates.map { it.bytes })
                 DiskImpactEstimate(
                     kind = when {
                         estimates.isEmpty() -> DiskImpactKind.None
-                        knownBytes.size == estimates.size -> DiskImpactKind.Required
+                        total != null -> DiskImpactKind.Required
                         else -> DiskImpactKind.Unknown
                     },
                     bytes = when {
                         estimates.isEmpty() -> 0
-                        knownBytes.size == estimates.size -> knownBytes.sum()
+                        total != null -> total
                         else -> null
                     },
                     availableBytes = available,
                     confidence = when {
                         estimates.isEmpty() -> EstimateConfidence.Exact
-                        knownBytes.size == estimates.size -> EstimateConfidence.Estimated
+                        total != null -> EstimateConfidence.Estimated
                         else -> EstimateConfidence.Unknown
                     },
                     explanation = when {
                         estimates.isEmpty() -> "Changing persisted defaults does not add or remove versions."
-                        knownBytes.size == estimates.size -> "Combined estimate for ${installCommands.size} planned install(s)."
+                        total != null -> "Combined estimate for ${installCommands.size} planned install(s)."
                         else -> "One or more planned installs have no local sibling size evidence."
                     },
                 )
@@ -398,12 +401,17 @@ class JvmSdkmanRepository(
                         availableBytes = available,
                     )
                 }
+                val total = exactStorageSum(estimates.map { it.bytes })
                 DiskImpactEstimate(
-                    kind = DiskImpactKind.Reclaimable,
-                    bytes = estimates.sumOf { it.bytes ?: 0L },
+                    kind = if (total == null) DiskImpactKind.Unknown else DiskImpactKind.Reclaimable,
+                    bytes = total,
                     availableBytes = available,
-                    confidence = EstimateConfidence.Exact,
-                    explanation = "Exact combined size of ${transaction.targets.size} selected local version directories.",
+                    confidence = if (total == null) EstimateConfidence.Unknown else EstimateConfidence.Exact,
+                    explanation = if (total == null) {
+                        "One or more selected version sizes are unknown or exceed the supported total."
+                    } else {
+                        "Exact combined size of ${transaction.targets.size} selected local version directories."
+                    },
                 )
             }
             is SdkmanTransaction.CleanLocalOnly -> reclaimableEstimate(
@@ -443,10 +451,11 @@ class JvmSdkmanRepository(
                             candidate = candidate.name,
                             candidateDisplayName = candidate.displayName,
                             version = version.version,
-                            measurement = measureStorageDirectory(
-                                fileSystem = fileSystem,
-                                root = versionPath(candidate.name, version.version),
-                            ),
+                            measurement = if (versionPathState(versionPath(candidate.name, version.version)) == PathPostcondition.Satisfied) {
+                                measureStorageDirectory(fileSystem, versionPath(candidate.name, version.version))
+                            } else {
+                                StorageMeasurement.Unknown(StorageUnknownReason.Unreadable)
+                            },
                             isDefault = candidate.defaultVersion == version.version,
                             isProtected = ProtectedVersion(candidate.name, version.version) in protected,
                             remoteAvailability = version.remoteAvailability,
@@ -597,9 +606,16 @@ class JvmSdkmanRepository(
         val outcomes = mutableListOf<CommandOutcome>()
         eligible.forEach { version ->
             val target = versionPath(candidate, version)
-            if (versionPathState(target) == PathPostcondition.Unsatisfied) {
-                outcomes += alreadySatisfied("$version is already absent.")
-                return@forEach
+            when (versionPathState(target)) {
+                PathPostcondition.Unsatisfied -> {
+                    outcomes += alreadySatisfied("$version is already absent.")
+                    return@forEach
+                }
+                PathPostcondition.Indeterminate -> {
+                    outcomes += indeterminate("The $version installation could not be verified safely.")
+                    return@forEach
+                }
+                PathPostcondition.Satisfied -> Unit
             }
             val result = runner().run(SdkmanCommand.Uninstall(candidate, version), 2.minutes)
             outcomes += result.verifiedOutcome(
@@ -661,6 +677,7 @@ class JvmSdkmanRepository(
 
     private suspend fun versionReport(candidate: String): VersionParseReport {
         validateCandidate(candidate)
+        check(inspector().safeCandidate(candidate)) { "Unsafe SDKMAN candidate directory." }
         val result = runner().run(SdkmanCommand.ListVersions(candidate), 20.seconds)
         if (!result.success) {
             val message = "Unable to list versions for $candidate (SDKMAN exit ${result.exitCode})."
@@ -676,16 +693,12 @@ class JvmSdkmanRepository(
     private fun versionPath(candidate: String, version: String): Path =
         home() / "candidates" / candidate / version
 
-    private fun versionPathState(path: Path): PathPostcondition {
-        val metadata = fileSystem.metadataOrNull(path) ?: return PathPostcondition.Unsatisfied
-        return if (metadata.isDirectory && metadata.symlinkTarget == null) {
-            PathPostcondition.Satisfied
-        } else {
-            PathPostcondition.Indeterminate
-        }
-    }
+    private fun inspector(): SdkmanFilesystemInspector = SdkmanFilesystemInspector(fileSystem, home())
+
+    private fun versionPathState(path: Path): PathPostcondition = inspector().versionState(path)
 
     private fun defaultPostcondition(candidate: String, version: String): PathPostcondition {
+        if (!inspector().safeCandidate(candidate)) return PathPostcondition.Indeterminate
         val candidatePath = home() / "candidates" / candidate
         val current = candidatePath / "current"
         val metadata = fileSystem.metadataOrNull(current) ?: return PathPostcondition.Unsatisfied
@@ -699,6 +712,7 @@ class JvmSdkmanRepository(
 
     private fun installedVersionsFor(candidate: String): List<String> {
         validateCandidate(candidate)
+        if (!inspector().safeCandidate(candidate)) return emptyList()
         val candidatePath = home() / "candidates" / candidate
         return fileSystem.listOrNull(candidatePath).orEmpty()
             .mapNotNull { versionPath ->
@@ -720,8 +734,8 @@ class JvmSdkmanRepository(
         val sizes = versions.map { version ->
             directorySize(home() / "candidates" / candidate / version)
         }
-        val total = sizes.filterNotNull().fold(0L, ::safeAdd)
-        val exact = sizes.all { it != null }
+        val total = exactStorageSum(sizes)
+        val exact = total != null
         return DiskImpactEstimate(
             kind = if (exact) DiskImpactKind.Reclaimable else DiskImpactKind.Unknown,
             bytes = total.takeIf { exact },
@@ -736,6 +750,7 @@ class JvmSdkmanRepository(
     }
 
     private fun directorySize(root: Path): Long? {
+        if (versionPathState(root) != PathPostcondition.Satisfied) return null
         return (measureStorageDirectory(fileSystem, root) as? StorageMeasurement.Exact)?.bytes
     }
 
@@ -746,11 +761,13 @@ class JvmSdkmanRepository(
 
     private fun defaultVersionFor(candidate: String): String? {
         validateCandidate(candidate)
+        if (!inspector().safeCandidate(candidate)) return null
         val candidatePath = home() / "candidates" / candidate
         return currentLinkTargetVersion(candidatePath, candidatePath / "current")
     }
 
     private fun currentLinkTargetVersion(candidatePath: Path, currentPath: Path): String? {
+        if (!inspector().safeCandidate(candidatePath.name)) return null
         val symlinkTarget = fileSystem.metadataOrNull(currentPath)?.symlinkTarget ?: return null
         val candidateNio = java.nio.file.Path.of(candidatePath.toString()).toAbsolutePath().normalize()
         val rawTarget = java.nio.file.Path.of(symlinkTarget.toString())
@@ -759,13 +776,19 @@ class JvmSdkmanRepository(
         } else {
             java.nio.file.Path.of(currentPath.parent!!.toString()).resolve(rawTarget).normalize()
         }
-        if (resolvedTarget.parent != candidateNio) return null
-        val version = resolvedTarget.fileName?.toString()?.takeIf(::isValidVersion) ?: return null
+        val canonicalTarget = runCatching { fileSystem.canonicalize(resolvedTarget.toString().toPath()) }.getOrNull()
+            ?: return null
+        val targetNio = java.nio.file.Path.of(canonicalTarget.toString()).toAbsolutePath().normalize()
+        if (targetNio.parent != candidateNio) return null
+        val version = targetNio.fileName?.toString()?.takeIf(::isValidVersion) ?: return null
         val targetMetadata = fileSystem.metadataOrNull(candidatePath / version) ?: return null
         return version.takeIf { targetMetadata.isDirectory && targetMetadata.symlinkTarget == null }
     }
 
-    private fun locateHome(): Path = sdkmanHomeResolver()
+    private fun locateHome(): Path {
+        val configured = sdkmanHomeResolver()
+        return runCatching { fileSystem.canonicalize(configured) }.getOrDefault(configured)
+    }
 
     private fun home(): Path = sdkmanHome ?: locateHome().also { sdkmanHome = it }
 
@@ -871,6 +894,7 @@ internal fun measureStorageDirectory(
                 metadata.isRegularFile -> {
                     val size = metadata.size
                         ?: return StorageMeasurement.Unknown(StorageUnknownReason.Unreadable)
+                    if (size < 0) return StorageMeasurement.Unknown(StorageUnknownReason.Unreadable)
                     if (Long.MAX_VALUE - total < size) {
                         return StorageMeasurement.Unknown(StorageUnknownReason.Overflow)
                     }
@@ -909,12 +933,6 @@ private fun okio.FileMetadata.storageFingerprint(): StorageFingerprint =
         lastModifiedAtMillis = lastModifiedAtMillis,
     )
 
-private enum class PathPostcondition {
-    Satisfied,
-    Unsatisfied,
-    Indeterminate,
-}
-
 private fun PathPostcondition.inverted(): PathPostcondition =
     when (this) {
         PathPostcondition.Satisfied -> PathPostcondition.Unsatisfied
@@ -922,8 +940,15 @@ private fun PathPostcondition.inverted(): PathPostcondition =
         PathPostcondition.Indeterminate -> PathPostcondition.Indeterminate
     }
 
-private fun safeAdd(left: Long, right: Long): Long =
-    if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
+internal fun exactStorageSum(sizes: List<Long?>): Long? {
+    var total = 0L
+    for (component in sizes) {
+        val size = component ?: return null
+        if (size < 0 || Long.MAX_VALUE - total < size) return null
+        total += size
+    }
+    return total
+}
 
 private fun medianSize(sortedSizes: List<Long>): Long {
     val middle = sortedSizes.size / 2

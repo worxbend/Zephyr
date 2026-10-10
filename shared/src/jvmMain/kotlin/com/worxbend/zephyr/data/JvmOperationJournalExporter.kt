@@ -62,6 +62,7 @@ private fun uniqueDestination(directory: Path, stem: String, extension: String):
 }
 
 private fun List<OperationJournalEntry>.toCsv(sensitivePaths: List<String>): String = buildString {
+    val redactor = SensitiveTextRedactor(sensitivePaths)
     appendLine("started,completed,status,operation,commands,outcome")
     this@toCsv.forEach { entry ->
         val commands = entry.transaction.commands.joinToString("; ") { command ->
@@ -75,16 +76,10 @@ private fun List<OperationJournalEntry>.toCsv(sensitivePaths: List<String>): Str
                 entry.transaction.title.removeSuffix("?"),
                 commands,
                 entry.outcome.orEmpty(),
-            ).joinToString(",") { it.redactPaths(sensitivePaths).csvField() },
+            ).joinToString(",") { redactor.redact(it).csvField() },
         )
     }
 }
-
-private fun String.redactPaths(sensitivePaths: List<String>): String =
-    sensitivePaths
-        .filter { it.isNotBlank() }
-        .sortedByDescending(String::length)
-        .fold(this) { redacted, path -> redacted.replace(path, "<redacted-path>") }
 
 private fun String.csvField(): String = "\"${replace("\"", "\"\"")}\""
 

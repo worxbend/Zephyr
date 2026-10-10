@@ -44,16 +44,21 @@ data class LocalOnlyObservation(
 fun AppSettings.reconcileLocalOnlyObservations(
     current: Set<ProtectedVersion>,
     nowEpochMillis: Long,
+    verifiedCandidates: Set<String> = current.mapTo(linkedSetOf()) { it.candidate },
 ): AppSettings {
     if (cleanupGracePeriod == CleanupGracePeriod.Off) {
         return if (localOnlyObservations.isEmpty()) this else copy(localOnlyObservations = emptyList())
     }
+    require(nowEpochMillis >= 0) { "Observation time must not be negative." }
+    require(current.all { it.candidate in verifiedCandidates }) { "Observations require verified candidate evidence." }
     val existing = localOnlyObservations.associateBy { it.candidate to it.version }
-    val next = current
-        .map { target ->
-            existing[target.candidate to target.version]
-                ?: LocalOnlyObservation(target.candidate, target.version, nowEpochMillis)
-        }
+    // An empty or failed audit is not evidence of removal. Replace only verified candidates.
+    val preserved = localOnlyObservations.filter { it.candidate !in verifiedCandidates }
+    val observed = current.map { target ->
+        existing[target.candidate to target.version]
+            ?: LocalOnlyObservation(target.candidate, target.version, nowEpochMillis)
+    }
+    val next = (preserved + observed)
         .sortedWith(compareBy(LocalOnlyObservation::candidate, LocalOnlyObservation::version))
     return if (next == localOnlyObservations) this else copy(localOnlyObservations = next)
 }

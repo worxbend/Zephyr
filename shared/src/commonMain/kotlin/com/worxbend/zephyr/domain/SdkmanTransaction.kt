@@ -12,7 +12,19 @@ data class PlannedSdkmanCommand(
     val action: SdkmanCommandAction,
     val candidate: String? = null,
     val version: String? = null,
-)
+) {
+    init {
+        when (action) {
+            SdkmanCommandAction.Install,
+            SdkmanCommandAction.Uninstall,
+            SdkmanCommandAction.SetDefault,
+            -> requireValidTarget(requireNotNull(candidate), requireNotNull(version))
+            SdkmanCommandAction.UpdateMetadata,
+            SdkmanCommandAction.SelfUpdate,
+            -> require(candidate == null && version == null) { "This command does not accept a candidate or version." }
+        }
+    }
+}
 
 sealed interface SdkmanTransaction {
     val title: String
