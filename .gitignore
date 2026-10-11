@@ -20,3 +20,4 @@ node_modules/
 dist/
 .flatpak-builder/
 /packaging/**/__pycache__/
+/tools/__pycache__/

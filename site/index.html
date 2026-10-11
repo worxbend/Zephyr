@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f8fc">
+  <title>Zephyr — Your SDKMAN toolchains, in view</title>
+  <meta name="description" content="A Linux desktop workbench for SDKMAN. See your JDKs and SDKs, review updates, and clean verified local-only versions with explicit protection checks.">
+  <link rel="canonical" href="https://worxbend.github.io/Zephyr/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Zephyr — Your SDKMAN toolchains, in view">
+  <meta property="og:description" content="A Linux desktop workbench for the SDKMAN installation you already use. Browse, switch, and review your toolchains in one place.">
+  <meta property="og:url" content="https://worxbend.github.io/Zephyr/">
+  <meta property="og:image" content="https://worxbend.github.io/Zephyr/assets/screenshot-1.png">
+  <meta property="og:image:alt" content="Zephyr's Installed JDK workspace with installed versions and the current default.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Zephyr — Your SDKMAN toolchains, in view">
+  <meta name="twitter:description" content="A Linux desktop workbench for SDKMAN. Your versions, defaults, updates, and cleanup decisions in one place.">
+  <meta name="twitter:image" content="https://worxbend.github.io/Zephyr/assets/screenshot-1.png">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="#" aria-label="Zephyr home"><img src="assets/icon.png" width="36" height="36" alt=""><span>Zephyr</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="https://github.com/worxbend/Zephyr">Source</a>
+      <a class="nav-install" href="#install">Get Zephyr</a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <p class="platform-note"><span class="platform-dot" aria-hidden="true"></span>A Linux desktop workbench for SDKMAN</p>
+      <h1 id="hero-title">Your toolchains.<br>All in view.</h1>
+      <div class="hero-bottom">
+        <p class="hero-description">The JDKs you switch between. The SDKs you rely on. The old versions you forgot about. Bring your SDKMAN installation into focus with Zephyr.</p>
+        <div class="hero-actions"><a class="button primary" href="#install">Download for Linux</a><a class="text-link" href="#features">Explore the workbench</a></div>
+      </div>
+      <figure class="hero-screen">
+        <div class="screen-heading"><span>Inside Zephyr</span><span>Installed JDKs</span></div>
+        <a href="assets/screenshot-1.png" aria-label="Open the full-size Installed JDK screenshot"><img src="assets/screenshot-1.png" width="1280" height="900" alt="Zephyr's Installed JDK workspace shows Eclipse Temurin versions, a default marker, search, and Terminal and Protect actions." fetchpriority="high"></a>
+        <figcaption>Your existing SDKMAN installation. A clearer way to work with it.</figcaption>
+      </figure>
+      <div class="hero-facts"><span>Linux amd64 &amp; arm64</span><span>Open source, MIT licensed</span><span>Built with Kotlin &amp; Compose Desktop</span></div>
+    </section>
+
+    <section class="features wrap section-space" id="features" aria-labelledby="features-title">
+      <div class="section-intro"><h2 id="features-title">Know what’s installed.<br>Choose what happens next.</h2><p>Zephyr wraps SDKMAN’s CLI and local filesystem. It doesn’t replace your package manager, and it doesn’t make cleanup decisions for you.</p></div>
+      <div class="feature-grid">
+        <article><h3>One view of your toolchains</h3><p>See installed JDKs and SDKs, their versions, and persisted defaults. Search your workspace without jumping between terminal listings.</p></article>
+        <article><h3>Browse with context</h3><p>Explore the SDKMAN catalog, filter JDKs by vendor, and inspect available updates before reviewing an install-and-activate plan.</p></article>
+        <article><h3>Clean up, deliberately</h3><p>Find verified local-only versions that are no longer in the remote catalog. Defaults and protected pins are excluded; removal needs your review and fresh verification.</p></article>
+        <article><h3>Review before you change</h3><p>Inspect typed mutation plans before confirming. See reclaimable space for removals and clearly labeled disk estimates for installs. Batch steps run sequentially, with individual outcomes—not a global rollback guarantee.</p></article>
+        <article><h3>Keep project environments close</h3><p>Import and export <code>.sdkmanrc</code> files, save named toolchain profiles, and capture environment snapshots. Review missing installs and default changes before restoring a snapshot.</p></article>
+        <article><h3>See outcomes, not assumptions</h3><p>Keep operation history, distinguish unknown availability from verified findings, and use integrity checks or redacted diagnostic exports when something needs attention.</p></article>
+      </div>
+      <aside class="comfort-note"><p><strong>A workbench that fits how you work.</strong> Find pages and versions with <kbd>Ctrl</kbd> + <kbd>K</kbd>, or open commands with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>. Choose your theme, density, and text scale.</p></aside>
+    </section>
+
+    <section class="gallery-section section-space" id="screenshots" aria-labelledby="screenshots-title">
+      <div class="wrap">
+        <div class="section-intro"><h2 id="screenshots-title">A place for every version.</h2><p>Real screens from the Linux application. From installed tools to the next thing you need.</p></div>
+        <div class="segmented gallery-controls" role="group" aria-label="Choose an application screenshot" hidden>
+          <button type="button" data-screen="jdk" aria-pressed="true" aria-controls="screen-jdk">Installed JDKs</button>
+          <button type="button" data-screen="sdks" aria-pressed="false" aria-controls="screen-sdks">Installed SDKs</button>
+          <button type="button" data-screen="catalog" aria-pressed="false" aria-controls="screen-catalog">SDK catalog</button>
+        </div>
+        <div class="gallery">
+          <figure id="screen-jdk" data-screen-panel="jdk"><a href="assets/screenshot-1.png"><img src="assets/screenshot-1.png" width="1280" height="900" alt="Installed JDKs with search, version details, the current default, and toolchain actions." loading="lazy"></a><figcaption><strong>Installed JDKs</strong><span>See versions and defaults, then choose a toolchain action.</span></figcaption></figure>
+          <figure id="screen-sdks" data-screen-panel="sdks"><a href="assets/screenshot-2.png"><img src="assets/screenshot-2.png" width="1280" height="900" alt="Zephyr's Installed SDKs workspace displays package cards and their default versions." loading="lazy"></a><figcaption><strong>Installed SDKs</strong><span>Your installed SDKMAN tools, together in one workspace.</span></figcaption></figure>
+          <figure id="screen-catalog" data-screen-panel="catalog"><a href="assets/screenshot-3.png"><img src="assets/screenshot-3.png" width="1280" height="900" alt="Browse SDKs with catalog results, search, installed and available filters, and favorites." loading="lazy"></a><figcaption><strong>SDK catalog</strong><span>Search, filter, and browse before choosing what to install.</span></figcaption></figure>
+        </div>
+        <p class="gallery-note">Select any screenshot to open the full-size image.</p>
+      </div>
+    </section>
+
+    <section class="install wrap section-space" id="install" aria-labelledby="install-title">
+      <div class="section-intro"><h2 id="install-title">Bring your SDKMAN.<br>We’ll bring the workspace.</h2><p>Published release <a href="{{RELEASE_URL}}">v{{VERSION}}</a>, for Linux amd64 and arm64. The Java runtime is included; you don’t need to install Java to run Zephyr.</p></div>
+      <div class="prerequisite"><strong>SDKMAN is required.</strong> Zephyr works with your user’s SDKMAN installation. If you don’t have it yet, follow the <a href="https://sdkman.io/install">official SDKMAN installation instructions</a>.</div>
+      <div class="architecture-row">
+        <div><h3>Your Linux architecture</h3><p>Choose amd64 for x86-64 PCs, or arm64 for ARM64 machines. Not sure? Run <code>uname -m</code>: <code>x86_64</code> means amd64; <code>aarch64</code> means arm64.</p></div>
+        <div class="segmented architecture-controls" role="group" aria-label="Choose download architecture" hidden><button type="button" data-architecture="amd64" aria-pressed="true">amd64 (x86-64)</button><button type="button" data-architecture="arm64" aria-pressed="false">arm64 (ARM64)</button></div>
+      </div>
+      <div class="checksum-note"><h3>Verify before installing</h3><p>Download the package you want and <a href="{{CHECKSUMS_URL}}" download>SHA256SUMS</a> from the same release into the same directory. Run the commands below there, and continue only if your downloaded package reports <strong>OK</strong>. Stop if verification fails. Checksums check file integrity; they are not an independent signature.</p></div>
+      <article class="package recommended" aria-labelledby="appimage-title">
+        <div class="package-intro"><div><span class="recommendation">Recommended</span><h3 id="appimage-title">AppImage</h3></div><p>The simplest way to use Zephyr with full host SDKMAN integration. Download, make executable, and launch.</p></div>
+        <div class="architecture-panel" data-arch-panel="amd64"><div class="download-row"><h4>AppImage for amd64</h4><a class="button primary" href="{{APPIMAGE_AMD64}}" download>Download amd64 AppImage</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy amd64 AppImage commands">Copy commands</button><pre tabindex="0" aria-label="amd64 AppImage commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+chmod +x Zephyr-{{VERSION}}-linux-amd64.AppImage &amp;&amp;
+./Zephyr-{{VERSION}}-linux-amd64.AppImage</code></pre></div></div>
+        <div class="architecture-panel" data-arch-panel="arm64"><div class="download-row"><h4>AppImage for arm64</h4><a class="button primary" href="{{APPIMAGE_ARM64}}" download>Download arm64 AppImage</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy arm64 AppImage commands">Copy commands</button><pre tabindex="0" aria-label="arm64 AppImage commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+chmod +x Zephyr-{{VERSION}}-linux-arm64.AppImage &amp;&amp;
+./Zephyr-{{VERSION}}-linux-arm64.AppImage</code></pre></div></div>
+      </article>
+      <div class="alternative-heading"><h3>Other release bundles</h3><p>Choose these when they fit your setup. Their integration and trust boundaries differ.</p></div>
+      <article class="package" aria-labelledby="flatpak-title">
+        <div class="package-intro"><h3 id="flatpak-title">Flatpak</h3><p>A standalone downloaded bundle, <strong>not a Flathub listing or an automatic-update application repository</strong>. Host SDKMAN integration is limited and activated host-terminal launch is unsupported. Prefer AppImage or classic Snap for host integration.</p></div>
+        <div class="architecture-panel" data-arch-panel="amd64"><div class="download-row"><h4>Flatpak for amd64</h4><a class="button secondary" href="{{FLATPAK_AMD64}}" download>Download amd64 Flatpak</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy amd64 Flatpak commands">Copy commands</button><pre tabindex="0" aria-label="amd64 Flatpak commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+flatpak install --user ./Zephyr-{{VERSION}}-linux-amd64.flatpak &amp;&amp;
+flatpak run com.worxbend.zephyr</code></pre></div></div>
+        <div class="architecture-panel" data-arch-panel="arm64"><div class="download-row"><h4>Flatpak for arm64</h4><a class="button secondary" href="{{FLATPAK_ARM64}}" download>Download arm64 Flatpak</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy arm64 Flatpak commands">Copy commands</button><pre tabindex="0" aria-label="arm64 Flatpak commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+flatpak install --user ./Zephyr-{{VERSION}}-linux-arm64.flatpak &amp;&amp;
+flatpak run com.worxbend.zephyr</code></pre></div></div>
+      </article>
+      <article class="package" aria-labelledby="snap-title">
+        <div class="package-intro"><h3 id="snap-title">Classic Snap</h3><p>Install the locally downloaded, unsigned release Snap. <code>--dangerous</code> skips Snap Store verification, so verify checksums first. <code>--classic</code> grants broad host access for SDKMAN integration. Snap Store availability is not assumed; see the <a href="https://github.com/worxbend/Zephyr/blob/main/snap/STORE_REVIEW.md">Store review documentation</a>.</p></div>
+        <div class="architecture-panel" data-arch-panel="amd64"><div class="download-row"><h4>Snap for amd64</h4><a class="button secondary" href="{{SNAP_AMD64}}" download>Download amd64 Snap</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy amd64 Snap commands">Copy commands</button><pre tabindex="0" aria-label="amd64 Snap commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+sudo snap install --dangerous --classic ./Zephyr-{{VERSION}}-linux-amd64.snap</code></pre></div></div>
+        <div class="architecture-panel" data-arch-panel="arm64"><div class="download-row"><h4>Snap for arm64</h4><a class="button secondary" href="{{SNAP_ARM64}}" download>Download arm64 Snap</a></div><div class="command-block"><button class="copy-command" type="button" hidden aria-label="Copy arm64 Snap commands">Copy commands</button><pre tabindex="0" aria-label="arm64 Snap commands"><code>sha256sum --check --ignore-missing SHA256SUMS &amp;&amp;
+sudo snap install --dangerous --classic ./Zephyr-{{VERSION}}-linux-arm64.snap</code></pre></div></div>
+      </article>
+      <p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+      <p class="install-help">Need packaging details? Read the <a href="https://github.com/worxbend/Zephyr/blob/main/DISTRIBUTION.md">Linux distribution guide</a> or visit <a href="{{RELEASE_URL}}">the full release</a>.</p>
+    </section>
+  </main>
+  <footer class="site-footer wrap"><div><a class="brand" href="#"><img src="assets/icon.png" width="28" height="28" alt=""><span>Zephyr</span></a><p>A clearer view of the tools you already use.</p></div><nav aria-label="Footer navigation"><a href="https://github.com/worxbend/Zephyr">Source</a><a href="https://github.com/worxbend/Zephyr/blob/main/README.md">Docs</a><a href="https://github.com/worxbend/Zephyr/blob/main/LICENSE">MIT license</a><a href="https://sdkman.io/install">Install SDKMAN</a></nav></footer>
+</body>
+</html>

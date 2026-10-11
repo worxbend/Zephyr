@@ -1,0 +1,12 @@
+{
+  "name": "zephyr-microsite",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@axe-core/playwright": "4.13.0"
+  }
+}

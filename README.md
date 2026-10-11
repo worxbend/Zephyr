@@ -3,6 +3,8 @@
 A desktop GUI for [SDKMAN](https://sdkman.io/) built with Kotlin Multiplatform and Compose Desktop.
 Zephyr wraps the SDKMAN CLI and local filesystem — it does not reimplement package management.
 
+[Explore the microsite and Linux installation guide](https://worxbend.github.io/Zephyr/).
+
 ---
 
 ## Downloads
