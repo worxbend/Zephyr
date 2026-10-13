@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -21,7 +22,7 @@ def release_values(release: dict) -> dict[str, str]:
     if release.get("draft") is not False or release.get("prerelease") is not False:
         raise ValueError("Downloads require a published, stable release")
     tag = release.get("tag_name", "")
-    if not isinstance(tag, str) or not re.fullmatch(r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)", tag):
+    if not isinstance(tag, str) or not re.fullmatch(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", tag):
         raise ValueError("Expected a stable numeric release tag")
     version = tag[1:]
     release_url = f"{REPOSITORY}/releases/tag/{tag}"
@@ -80,11 +81,17 @@ def build(root: Path, output: Path, release: dict, source_sha: str = "local") ->
     for path in copies.values():
         if not path.is_file() or path.is_symlink():
             raise ValueError(f"Missing or linked site asset: {path}")
-    output = output.resolve()
-    # Never clear source or arbitrary directories: the artifact lives below build/.
-    build_root = (root / "build").resolve()
+    # Normalize without following aliases: resolving build/ first would authorize
+    # deleting external data when that directory is a symlink.
+    output = Path(os.path.abspath(output))
+    build_root = root.resolve() / "build"
     if output == build_root or not output.is_relative_to(build_root):
         raise ValueError("Site output must be a subdirectory of the repository build directory")
+    current = root.resolve()
+    for component in ("build", *output.relative_to(build_root).parts):
+        current = current / component
+        if current.is_symlink():
+            raise ValueError("Site output paths cannot contain symbolic links")
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)

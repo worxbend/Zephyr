@@ -32,6 +32,18 @@ class SiteBuildTest(unittest.TestCase):
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 release_values({**self.release, **mutation})
 
+    def test_release_tag_rejects_unicode_digits(self):
+        changed = copy.deepcopy(self.release)
+        original_version = self.release["tag_name"][1:]
+        tag = self.release["tag_name"] + "\u0661"
+        changed["tag_name"] = tag
+        changed["html_url"] = f"https://github.com/worxbend/Zephyr/releases/tag/{tag}"
+        for asset in changed["assets"]:
+            asset["name"] = asset["name"].replace(original_version, tag[1:])
+            asset["browser_download_url"] = f"https://github.com/worxbend/Zephyr/releases/download/{tag}/{asset['name']}"
+        with self.assertRaises(ValueError):
+            release_values(changed)
+
     def test_all_six_architecture_format_assets_and_checksums_are_required(self):
         for asset in self.release["assets"]:
             changed = {**self.release, "assets": [a for a in self.release["assets"] if a != asset]}
@@ -99,6 +111,36 @@ class SiteBuildTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build(root, output, self.release)
             self.assertEqual((output / "index.html").read_text(), "previous")
+
+    def test_output_rejects_symlinked_build_root_and_nested_aliases(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
+            root = Path(tmp) / "repo"
+            self.make_source(root)
+            outside = Path(tmp) / "outside"
+            previous = outside / "site/index.html"
+            previous.parent.mkdir(parents=True)
+            previous.write_text("external sentinel")
+            build_root = root / "build"
+            build_root.symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                build(root, build_root / "site", self.release)
+            self.assertEqual(previous.read_text(), "external sentinel")
+
+            build_root.unlink()
+            build_root.mkdir()
+            # An in-tree alias must not redirect deletion to a different build artifact.
+            protected = build_root / "other-artifact"
+            protected.mkdir()
+            sentinel = protected / "sentinel"
+            sentinel.write_text("owned by another task")
+            alias = build_root / "site"
+            alias.symlink_to(protected, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                build(root, alias, self.release)
+            self.assertEqual(sentinel.read_text(), "owned by another task")
+            with self.assertRaises(ValueError):
+                build(root, alias / "nested", self.release)
+            self.assertFalse((protected / "nested").exists())
 
     def test_output_cannot_replace_repository_or_source_directory(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:

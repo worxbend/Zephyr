@@ -3,14 +3,10 @@ package com.worxbend.zephyr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,9 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,8 +31,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -44,9 +43,10 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -54,17 +54,18 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpOffset
-import com.worxbend.zephyr.domain.CandidateKind
-import com.worxbend.zephyr.domain.BatchItemStatus
-import com.worxbend.zephyr.domain.OperationStatus
+import androidx.compose.ui.unit.dp
 import com.worxbend.zephyr.domain.ActivityAction
 import com.worxbend.zephyr.domain.ActivitySeverity
+import com.worxbend.zephyr.domain.BatchItemStatus
+import com.worxbend.zephyr.domain.CandidateKind
+import com.worxbend.zephyr.domain.OperationStatus
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import org.jetbrains.compose.resources.painterResource
 import zephyr.shared.generated.resources.Res
@@ -72,36 +73,61 @@ import zephyr.shared.generated.resources.ic_jdk
 import zephyr.shared.generated.resources.ic_sdk
 
 @Composable
-internal fun PageTitle(title: String, subtitle: String) {
+internal fun PageTitle(
+    title: String,
+    subtitle: String,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-        Text(subtitle, modifier = Modifier.widthIn(max = 760.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            title,
+            modifier = Modifier.semantics { heading() },
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            subtitle,
+            modifier = Modifier.widthIn(max = 760.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
 @Composable
-internal fun ZephyrSectionHeading(title: String, detail: String? = null, modifier: Modifier = Modifier) {
+internal fun ZephyrSectionHeading(
+    title: String,
+    detail: String? = null,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(title, modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
 @Composable
-internal fun ZephyrKeycap(label: String, modifier: Modifier = Modifier) {
+internal fun ZephyrKeycap(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         label,
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.shapes.extraSmall)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall)
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.shapes.extraSmall)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall)
+                .padding(horizontal = 7.dp, vertical = 3.dp),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
 @Composable
-internal fun ZephyrTableHeading(columns: List<String>, modifier: Modifier = Modifier) {
+internal fun ZephyrTableHeading(
+    columns: List<String>,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
             columns.forEach { label ->
@@ -134,12 +160,13 @@ internal fun SearchField(
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        modifier = modifier
-            .height(metrics.controlHeight)
-            .clip(RoundedCornerShape(metrics.cornerRadius))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(if (focused) 2.dp else 1.dp, borderColor, RoundedCornerShape(metrics.cornerRadius))
-            .onFocusChanged { focused = it.isFocused },
+        modifier =
+            modifier
+                .height(metrics.controlHeight)
+                .clip(RoundedCornerShape(metrics.cornerRadius))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .border(if (focused) 2.dp else 1.dp, borderColor, RoundedCornerShape(metrics.cornerRadius))
+                .onFocusChanged { focused = it.isFocused },
         decorationBox = { innerTextField ->
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -160,10 +187,11 @@ internal fun SearchField(
                 if (value.isNotEmpty()) {
                     Text(
                         text = "×",
-                        modifier = Modifier
-                            .semantics { contentDescription = "Clear search" }
-                            .clickable(role = Role.Button) { onValueChange("") }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier =
+                            Modifier
+                                .semantics { contentDescription = "Clear search" }
+                                .clickable(role = Role.Button) { onValueChange("") }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -231,20 +259,22 @@ internal fun ContextActionArea(
     var offset by remember { mutableStateOf(DpOffset.Zero) }
     val density = LocalDensity.current
     Box(
-        modifier = modifier.onPointerEvent(
-            eventType = PointerEventType.Press,
-            pass = PointerEventPass.Initial,
-        ) { event ->
-            if (event.buttons.isSecondaryPressed) {
-                event.changes.firstOrNull()?.position?.let { position ->
-                    offset = with(density) {
-                        DpOffset(position.x.toDp(), position.y.toDp())
+        modifier =
+            modifier.onPointerEvent(
+                eventType = PointerEventType.Press,
+                pass = PointerEventPass.Initial,
+            ) { event ->
+                if (event.buttons.isSecondaryPressed) {
+                    event.changes.firstOrNull()?.position?.let { position ->
+                        offset =
+                            with(density) {
+                                DpOffset(position.x.toDp(), position.y.toDp())
+                            }
                     }
+                    expanded = true
+                    event.changes.forEach { it.consume() }
                 }
-                expanded = true
-                event.changes.forEach { it.consume() }
-            }
-        },
+            },
     ) {
         content()
         DropdownMenu(
@@ -310,10 +340,11 @@ internal fun AccordionHeader(
         if (actionLabel != null && onAction != null) {
             Text(
                 actionLabel,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(5.dp))
-                    .clickable(role = Role.Button, onClick = onAction)
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .clickable(role = Role.Button, onClick = onAction)
+                        .padding(horizontal = 7.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
@@ -323,7 +354,12 @@ internal fun AccordionHeader(
 }
 
 @Composable
-internal fun EmptyState(title: String, text: String, action: String? = null, onAction: (() -> Unit)? = null) {
+internal fun EmptyState(
+    title: String,
+    text: String,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.widthIn(max = 560.dp).padding(32.dp),
@@ -385,30 +421,36 @@ internal fun badgeToneLabel(tone: BadgeTone): String? =
     }
 
 @Composable
-internal fun Badge(text: String, tone: BadgeTone = BadgeTone.Neutral) {
-    val background = when (tone) {
-        BadgeTone.Neutral -> MaterialTheme.colorScheme.secondaryContainer
-        BadgeTone.Primary -> MaterialTheme.colorScheme.primaryContainer
-        BadgeTone.Success -> LocalZephyrColors.current.successContainer
-        BadgeTone.Warning -> LocalZephyrColors.current.warningContainer
-        BadgeTone.Error -> MaterialTheme.colorScheme.errorContainer
-    }
-    val foreground = when (tone) {
-        BadgeTone.Neutral -> MaterialTheme.colorScheme.onSecondaryContainer
-        BadgeTone.Primary -> MaterialTheme.colorScheme.onPrimaryContainer
-        BadgeTone.Success -> LocalZephyrColors.current.onSuccess
-        BadgeTone.Warning -> LocalZephyrColors.current.onWarning
-        BadgeTone.Error -> MaterialTheme.colorScheme.onErrorContainer
-    }
+internal fun Badge(
+    text: String,
+    tone: BadgeTone = BadgeTone.Neutral,
+) {
+    val background =
+        when (tone) {
+            BadgeTone.Neutral -> MaterialTheme.colorScheme.secondaryContainer
+            BadgeTone.Primary -> MaterialTheme.colorScheme.primaryContainer
+            BadgeTone.Success -> LocalZephyrColors.current.successContainer
+            BadgeTone.Warning -> LocalZephyrColors.current.warningContainer
+            BadgeTone.Error -> MaterialTheme.colorScheme.errorContainer
+        }
+    val foreground =
+        when (tone) {
+            BadgeTone.Neutral -> MaterialTheme.colorScheme.onSecondaryContainer
+            BadgeTone.Primary -> MaterialTheme.colorScheme.onPrimaryContainer
+            BadgeTone.Success -> LocalZephyrColors.current.onSuccess
+            BadgeTone.Warning -> LocalZephyrColors.current.onWarning
+            BadgeTone.Error -> MaterialTheme.colorScheme.onErrorContainer
+        }
     val toneLabel = badgeToneLabel(tone)
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .semantics {
-                contentDescription = toneLabel?.let { "$it: $text" } ?: text
-            },
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(background)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .semantics {
+                    contentDescription = toneLabel?.let { "$it: $text" } ?: text
+                },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -429,11 +471,13 @@ internal fun CodeBlock(text: String) {
     SelectionContainer {
         Text(
             text,
-            modifier = Modifier.fillMaxWidth()
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+                    .padding(16.dp),
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         )
@@ -457,12 +501,13 @@ internal fun MessageOverlay(
             onDismiss(eventId)
         }
     }
-    val tone = when (severity) {
-        ActivitySeverity.Error -> MaterialTheme.colorScheme.error
-        ActivitySeverity.Warning -> LocalZephyrColors.current.warning
-        ActivitySeverity.Info -> LocalZephyrColors.current.info
-        ActivitySeverity.Success -> LocalZephyrColors.current.success
-    }
+    val tone =
+        when (severity) {
+            ActivitySeverity.Error -> MaterialTheme.colorScheme.error
+            ActivitySeverity.Warning -> LocalZephyrColors.current.warning
+            ActivitySeverity.Info -> LocalZephyrColors.current.info
+            ActivitySeverity.Success -> LocalZephyrColors.current.success
+        }
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomEnd) {
         Column(
             Modifier
@@ -494,31 +539,59 @@ internal const val LEGACY_MESSAGE_EVENT_ID = Long.MIN_VALUE
 
 @Composable
 internal fun BusyOverlay(state: ZephyrUiState.Ready) {
-    val label = when {
-        state.batchUninstallProgress.any { it.status == BatchItemStatus.Running } -> {
-            val completed = state.batchUninstallProgress.count {
-                it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+    val label =
+        when {
+            state.batchUninstallProgress.any { it.status == BatchItemStatus.Running } -> {
+                val completed =
+                    state.batchUninstallProgress.count {
+                        it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+                    }
+                "Uninstalling version ${completed + 1} of ${state.batchUninstallProgress.size}"
             }
-            "Uninstalling version ${completed + 1} of ${state.batchUninstallProgress.size}"
-        }
-        state.batchInstallProgress.any { it.status == BatchItemStatus.Running } -> {
-            val completed = state.batchInstallProgress.count {
-                it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+
+            state.batchInstallProgress.any { it.status == BatchItemStatus.Running } -> {
+                val completed =
+                    state.batchInstallProgress.count {
+                        it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+                    }
+                "Installing toolchain item ${completed + 1} of ${state.batchInstallProgress.size}"
             }
-            "Installing toolchain item ${completed + 1} of ${state.batchInstallProgress.size}"
+
+            state.localOnlyScanInProgress -> {
+                state.localOnlyScanProgress?.let {
+                    "Scanning local-only versions: ${it.completed} of ${it.total} completed" +
+                        if (it.activeCandidates.isEmpty()) "" else "; active ${it.activeCandidates.joinToString()}"
+                } ?: "Scanning local-only versions"
+            }
+
+            state.storageScanInProgress -> {
+                "Measuring installed payloads"
+            }
+
+            state.isCatalogLoading -> {
+                "Loading SDKMAN catalog"
+            }
+
+            state.detailLoadingCandidate != null -> {
+                "Loading package details"
+            }
+
+            state.transactionPreviewLoading -> {
+                "Calculating disk impact"
+            }
+
+            state.diagnosticsExportInProgress -> {
+                "Exporting support bundle"
+            }
+
+            state.isRefreshing -> {
+                "Refreshing"
+            }
+
+            else -> {
+                return
+            }
         }
-        state.localOnlyScanInProgress -> state.localOnlyScanProgress?.let {
-            "Scanning local-only versions: ${it.completed} of ${it.total} completed" +
-                if (it.activeCandidates.isEmpty()) "" else "; active ${it.activeCandidates.joinToString()}"
-        } ?: "Scanning local-only versions"
-        state.storageScanInProgress -> "Measuring installed payloads"
-        state.isCatalogLoading -> "Loading SDKMAN catalog"
-        state.detailLoadingCandidate != null -> "Loading package details"
-        state.transactionPreviewLoading -> "Calculating disk impact"
-        state.diagnosticsExportInProgress -> "Exporting support bundle"
-        state.isRefreshing -> "Refreshing"
-        else -> return
-    }
     Box(
         Modifier.fillMaxSize().padding(top = LocalZephyrMetrics.current.toolbarHeight + 12.dp),
         contentAlignment = Alignment.TopCenter,

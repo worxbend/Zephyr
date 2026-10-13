@@ -2,8 +2,8 @@ package com.worxbend.zephyr.sdkman
 
 import com.worxbend.zephyr.domain.CandidateCatalogItem
 import com.worxbend.zephyr.domain.CandidateKind
-import java.nio.file.Files
 import okio.Path.Companion.toPath
+import java.nio.file.Files
 import kotlin.io.path.deleteIfExists
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,21 +58,56 @@ class JvmCandidateMetadataCacheStoreTest {
     }
 
     @Test
+    fun oversizedCacheIsIgnoredWithoutChangingItsBytes() {
+        val root = sdkmanTestDirectory("zephyr-cache-size-")
+        try {
+            val path = root.resolve("catalog.cache")
+            val content = "zephyr-candidate-cache=1\ncached-at-epoch-millis=42\n" + "\n".repeat(8 * 1_024 * 1_024)
+            Files.writeString(path, content)
+
+            assertEquals(null, JvmCandidateMetadataCacheStore(path).load())
+            assertEquals(content.length.toLong(), Files.size(path))
+        } finally {
+            okio.FileSystem.SYSTEM.deleteRecursively(root.toString().toPath())
+        }
+    }
+
+    @Test
+    fun oversizedReplacementRetainsPreviousCacheAndCleansTemporaryFile() {
+        val root = sdkmanTestDirectory("zephyr-cache-save-size-")
+        try {
+            val path = root.resolve("catalog.cache")
+            val store = JvmCandidateMetadataCacheStore(path) { 42L }
+            store.save(emptyList())
+            val before = Files.readAllBytes(path)
+            val item = CandidateCatalogItem("java", "Java", null, "x".repeat(7 * 1_024 * 1_024), null, CandidateKind.Sdk, false)
+
+            store.save(listOf(item))
+
+            kotlin.test.assertContentEquals(before, Files.readAllBytes(path))
+            Files.list(root).use { assertEquals(listOf(path), it.toList()) }
+        } finally {
+            okio.FileSystem.SYSTEM.deleteRecursively(root.toString().toPath())
+        }
+    }
+
+    @Test
     fun cacheRoundTripsMetadataAndTimestampDeterministically() {
         val root = sdkmanTestDirectory("zephyr-catalog-")
         val path = root.resolve("catalog.cache")
         try {
-            val items = listOf(
-                CandidateCatalogItem(
-                    name = "gradle",
-                    displayName = "Gradle",
-                    stableVersion = "8.14",
-                    description = "Build automation\twith unicode ✓",
-                    websiteUrl = "https://gradle.org",
-                    kind = CandidateKind.Sdk,
-                    isInstalled = true,
-                ),
-            )
+            val items =
+                listOf(
+                    CandidateCatalogItem(
+                        name = "gradle",
+                        displayName = "Gradle",
+                        stableVersion = "8.14",
+                        description = "Build automation\twith unicode ✓",
+                        websiteUrl = "https://gradle.org",
+                        kind = CandidateKind.Sdk,
+                        isInstalled = true,
+                    ),
+                )
             val store = JvmCandidateMetadataCacheStore(path) { 42L }
 
             store.save(items)
