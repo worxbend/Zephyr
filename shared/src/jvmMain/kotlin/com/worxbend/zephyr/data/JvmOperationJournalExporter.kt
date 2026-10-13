@@ -2,6 +2,8 @@ package com.worxbend.zephyr.data
 
 import com.worxbend.zephyr.domain.JournalExportResult
 import com.worxbend.zephyr.domain.OperationJournalEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -9,8 +11,6 @@ import java.nio.file.StandardOpenOption
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 internal class JvmOperationJournalExporter(
     private val outputDirectory: () -> Path = ::defaultExportDirectory,
@@ -48,10 +48,13 @@ private fun defaultExportDirectory(): Path {
     return if (Files.isDirectory(downloads)) downloads else home
 }
 
-private fun defaultSensitivePaths(): List<String> =
-    defaultSensitiveExportPaths()
+private fun defaultSensitivePaths(): List<String> = defaultSensitiveExportPaths()
 
-private fun uniqueDestination(directory: Path, stem: String, extension: String): Path {
+private fun uniqueDestination(
+    directory: Path,
+    stem: String,
+    extension: String,
+): Path {
     var destination = directory.resolve("$stem$extension")
     var suffix = 2
     while (Files.exists(destination)) {
@@ -61,25 +64,27 @@ private fun uniqueDestination(directory: Path, stem: String, extension: String):
     return destination
 }
 
-private fun List<OperationJournalEntry>.toCsv(sensitivePaths: List<String>): String = buildString {
-    val redactor = SensitiveTextRedactor(sensitivePaths)
-    appendLine("started,completed,status,operation,commands,outcome")
-    this@toCsv.forEach { entry ->
-        val commands = entry.transaction.commands.joinToString("; ") { command ->
-            listOfNotNull(command.action.label, command.candidate, command.version).joinToString(" ")
+private fun List<OperationJournalEntry>.toCsv(sensitivePaths: List<String>): String =
+    buildString {
+        val redactor = SensitiveTextRedactor(sensitivePaths)
+        appendLine("started,completed,status,operation,commands,outcome")
+        this@toCsv.forEach { entry ->
+            val commands =
+                entry.transaction.commands.joinToString("; ") { command ->
+                    listOfNotNull(command.action.label, command.candidate, command.version).joinToString(" ")
+                }
+            appendLine(
+                listOf(
+                    formatLocalTimestamp(entry.startedAtEpochMillis),
+                    entry.completedAtEpochMillis?.let(::formatLocalTimestamp).orEmpty(),
+                    entry.status.label,
+                    entry.transaction.title.removeSuffix("?"),
+                    commands,
+                    entry.outcome.orEmpty(),
+                ).joinToString(",") { redactor.redact(it).csvField() },
+            )
         }
-        appendLine(
-            listOf(
-                formatLocalTimestamp(entry.startedAtEpochMillis),
-                entry.completedAtEpochMillis?.let(::formatLocalTimestamp).orEmpty(),
-                entry.status.label,
-                entry.transaction.title.removeSuffix("?"),
-                commands,
-                entry.outcome.orEmpty(),
-            ).joinToString(",") { redactor.redact(it).csvField() },
-        )
     }
-}
 
 private fun String.csvField(): String = "\"${replace("\"", "\"\"")}\""
 

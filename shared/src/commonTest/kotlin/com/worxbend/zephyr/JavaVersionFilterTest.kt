@@ -8,18 +8,20 @@ import kotlin.test.assertEquals
 class JavaVersionFilterTest {
     @Test
     fun combinesStatusVendorQueryAndSort() {
-        val versions = listOf(
-            javaVersion("21.0.5-tem", "tem", "Eclipse Temurin", installed = true, available = true),
-            javaVersion("17.0.12-zulu", "zulu", "Azul Zulu", installed = true, available = false),
-            javaVersion("22.0.1-tem", "tem", "Eclipse Temurin", installed = false, available = true),
-        )
+        val versions =
+            listOf(
+                javaVersion("21.0.5-tem", "tem", "Eclipse Temurin", installed = true, available = true),
+                javaVersion("17.0.12-zulu", "zulu", "Azul Zulu", installed = true, available = false),
+                javaVersion("22.0.1-tem", "tem", "Eclipse Temurin", installed = false, available = true),
+            )
 
-        val filtered = versions.filterAndSort(
-            query = "tem",
-            status = JavaVersionStatusFilter.Available,
-            providerCode = "tem",
-            sort = JavaVersionSort.Version,
-        )
+        val filtered =
+            versions.filterAndSort(
+                query = "tem",
+                status = JavaVersionStatusFilter.Available,
+                providerCode = "tem",
+                sort = JavaVersionSort.Version,
+            )
 
         assertEquals(listOf("22.0.1-tem", "21.0.5-tem"), filtered.map { it.identifier })
     }

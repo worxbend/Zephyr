@@ -21,10 +21,11 @@ class OperationNotificationsTest {
 
     @Test
     fun notificationNeverIncludesRepositoryOutcomeOrSensitivePaths() {
-        val notification = operationNotification(
-            OperationNotificationPolicy.AllCompletions,
-            entry(completedAt = 2, status = OperationStatus.Failed, outcome = "Failed in /home/alex/.sdkman"),
-        )
+        val notification =
+            operationNotification(
+                OperationNotificationPolicy.AllCompletions,
+                entry(completedAt = 2, status = OperationStatus.Failed, outcome = "Failed in /home/alex/.sdkman"),
+            )
 
         assertFalse(notification!!.message.contains("/home/alex"))
         assertEquals(

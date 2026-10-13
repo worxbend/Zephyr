@@ -96,17 +96,26 @@ internal fun StorageCenterScreen(
             }
         }
         when {
-            state.storageScanInProgress && inventory == null -> ZephyrProgressIndicator()
-            inventory == null -> EmptyState(
-                "Storage not measured",
-                "Run a safe filesystem scan to calculate logical payload sizes.",
-                "Measure storage",
-                viewModel::refreshStorage,
-            )
-            inventory.versions.isEmpty() -> EmptyState(
-                "No installed payloads",
-                "SDKMAN has no installed candidate versions to measure.",
-            )
+            state.storageScanInProgress && inventory == null -> {
+                ZephyrProgressIndicator()
+            }
+
+            inventory == null -> {
+                EmptyState(
+                    "Storage not measured",
+                    "Run a safe filesystem scan to calculate logical payload sizes.",
+                    "Measure storage",
+                    viewModel::refreshStorage,
+                )
+            }
+
+            inventory.versions.isEmpty() -> {
+                EmptyState(
+                    "No installed payloads",
+                    "SDKMAN has no installed candidate versions to measure.",
+                )
+            }
+
             else -> {
                 val listState = rememberLazyListState()
                 Box(Modifier.fillMaxSize()) {
@@ -212,9 +221,10 @@ internal fun LocalOnlyScreen(
     val progress = state.localOnlyScanProgress
     val items = state.candidates.filter { it.hasLocalOnlyVersions }
     val versionCount = items.sumOf { it.localOnlyVersionCount }
-    val reviewDueCount = reviewDueVersions.count { target ->
-        items.any { it.name == target.candidate && target.version in it.localOnlyVersions }
-    }
+    val reviewDueCount =
+        reviewDueVersions.count { target ->
+            items.any { it.name == target.candidate && target.version in it.localOnlyVersions }
+        }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
         PageTitle(
             "Local-Only Versions",
@@ -225,25 +235,30 @@ internal fun LocalOnlyScreen(
                 modifier = Modifier.fillMaxWidth().padding(LocalZephyrMetrics.current.panelPadding),
                 content = {
                     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatusDot(if (versionCount == 0) StatusTone.Success else StatusTone.Warning)
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (versionCount == 0) "Environment is clean" else "Review before removing",
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            when {
-                                reviewDueCount > 0 ->
-                                    "$reviewDueCount version(s) passed the ${cleanupGracePeriod.label} grace period. Review is still required."
-                                cleanupGracePeriod != CleanupGracePeriod.Off ->
-                                    "The ${cleanupGracePeriod.label} grace policy is active; cleanup always requires review."
-                                else ->
-                                    "Zephyr re-verifies every selected version against remote metadata before cleanup."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                        StatusDot(if (versionCount == 0) StatusTone.Success else StatusTone.Warning)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (versionCount == 0) "Environment is clean" else "Review before removing",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                when {
+                                    reviewDueCount > 0 -> {
+                                        "$reviewDueCount version(s) passed the ${cleanupGracePeriod.label} grace period. Review is still required."
+                                    }
+
+                                    cleanupGracePeriod != CleanupGracePeriod.Off -> {
+                                        "The ${cleanupGracePeriod.label} grace policy is active; cleanup always requires review."
+                                    }
+
+                                    else -> {
+                                        "Zephyr re-verifies every selected version against remote metadata before cleanup."
+                                    }
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
             ) {
@@ -251,14 +266,15 @@ internal fun LocalOnlyScreen(
             }
         }
         progress?.let { scan ->
-            val progressDescription = buildString {
-                append("Local-only audit ${scan.completed} of ${scan.total} completed.")
-                if (scan.activeCandidates.isNotEmpty()) {
-                    append(" Active: ${scan.activeCandidates.joinToString()}.")
+            val progressDescription =
+                buildString {
+                    append("Local-only audit ${scan.completed} of ${scan.total} completed.")
+                    if (scan.activeCandidates.isNotEmpty()) {
+                        append(" Active: ${scan.activeCandidates.joinToString()}.")
+                    }
+                    append(" ${scan.trustedFindings.sumOf { it.localOnlyVersionCount }} trusted partial findings.")
+                    append(" ${scan.failures.size} failures.")
                 }
-                append(" ${scan.trustedFindings.sumOf { it.localOnlyVersionCount }} trusted partial findings.")
-                append(" ${scan.failures.size} failures.")
-            }
             ZephyrPanel(
                 Modifier
                     .fillMaxWidth()
@@ -319,7 +335,15 @@ internal fun LocalOnlyScreen(
                 reviewDueVersions = reviewDueVersions,
                 cleanupVersionsByCandidate = trustedCleanupVersionsByCandidate(state, items),
                 onOpen = { candidate ->
-                    onNavigate(if (candidate.kind == CandidateKind.Jdk) ZephyrRoute.JdkDetail(candidate.name) else ZephyrRoute.SdkDetail(candidate.name))
+                    onNavigate(
+                        if (candidate.kind ==
+                            CandidateKind.Jdk
+                        ) {
+                            ZephyrRoute.JdkDetail(candidate.name)
+                        } else {
+                            ZephyrRoute.SdkDetail(candidate.name)
+                        },
+                    )
                 },
                 onClean = onClean,
             )

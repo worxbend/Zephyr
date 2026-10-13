@@ -114,15 +114,16 @@ internal fun CandidateComparisonScreen(
                 ) {
                     items(rows, key = VersionComparisonRow::version) { row ->
                         ComparisonTableRow(
-                            values = listOf(
-                                row.version,
-                                row.vendor,
-                                row.installed.yesNo(),
-                                row.default.yesNo(),
-                                row.available.yesNo(),
-                                row.localOnly.yesNo(),
-                                row.protected.yesNo(),
-                            ),
+                            values =
+                                listOf(
+                                    row.version,
+                                    row.vendor,
+                                    row.installed.yesNo(),
+                                    row.default.yesNo(),
+                                    row.available.yesNo(),
+                                    row.localOnly.yesNo(),
+                                    row.protected.yesNo(),
+                                ),
                         )
                     }
                 }
@@ -145,7 +146,11 @@ private fun ComparisonTableRow(
                         val labels = listOf("Version", "Vendor", "Installed", "Default", "Available", "Local-only", "Protected")
                         values.drop(1).forEachIndexed { index, value ->
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(labels[index + 1], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    labels[index + 1],
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                                 Text(value, style = MaterialTheme.typography.bodySmall)
                             }
                         }

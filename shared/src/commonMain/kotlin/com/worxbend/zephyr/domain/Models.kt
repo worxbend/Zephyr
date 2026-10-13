@@ -11,16 +11,26 @@ data class SdkmanStatus(
 
 sealed interface SdkmanSelfUpdateStatus {
     data object NotChecked : SdkmanSelfUpdateStatus
+
     data object UpToDate : SdkmanSelfUpdateStatus
+
     data object Updated : SdkmanSelfUpdateStatus
-    data class Failed(val message: String) : SdkmanSelfUpdateStatus
+
+    data class Failed(
+        val message: String,
+    ) : SdkmanSelfUpdateStatus
 }
 
 sealed interface CandidateMetadataStatus {
     data object NotChecked : CandidateMetadataStatus
+
     data object Refreshing : CandidateMetadataStatus
+
     data object Refreshed : CandidateMetadataStatus
-    data class Failed(val message: String) : CandidateMetadataStatus
+
+    data class Failed(
+        val message: String,
+    ) : CandidateMetadataStatus
 }
 
 data class Candidate(
@@ -68,13 +78,17 @@ data class CandidateVersion(
         get() = remoteAvailability == RemoteAvailability.LocalOnly
 }
 
-enum class RemoteAvailability(val label: String) {
+enum class RemoteAvailability(
+    val label: String,
+) {
     Available("Available"),
     LocalOnly("Local only"),
     Unknown("Availability unknown"),
 }
 
-enum class RemoteEvidenceState(val label: String) {
+enum class RemoteEvidenceState(
+    val label: String,
+) {
     Unknown("Remote evidence unavailable"),
     LivePartial("Remote evidence incomplete"),
     LiveComplete("Remote evidence verified"),
@@ -122,13 +136,16 @@ data class CommandOutcome(
     val status: CommandOutcomeStatus = if (success) CommandOutcomeStatus.Applied else CommandOutcomeStatus.Failed,
 ) {
     init {
-        val verifiedSuccess = status == CommandOutcomeStatus.Applied ||
-            status == CommandOutcomeStatus.AppliedWithWarning || status == CommandOutcomeStatus.AlreadySatisfied
+        val verifiedSuccess =
+            status == CommandOutcomeStatus.Applied ||
+                status == CommandOutcomeStatus.AppliedWithWarning || status == CommandOutcomeStatus.AlreadySatisfied
         require(success == verifiedSuccess) { "Command success must match its verification status." }
     }
 }
 
-enum class CommandOutcomeStatus(val label: String) {
+enum class CommandOutcomeStatus(
+    val label: String,
+) {
     Applied("Applied"),
     AppliedWithWarning("Applied with warning"),
     AlreadySatisfied("Already satisfied"),
@@ -136,21 +153,23 @@ enum class CommandOutcomeStatus(val label: String) {
     Indeterminate("Could not verify"),
 }
 
-fun candidateKindFor(name: String): CandidateKind =
-    if (name == "java") CandidateKind.Jdk else CandidateKind.Sdk
+fun candidateKindFor(name: String): CandidateKind = if (name == "java") CandidateKind.Jdk else CandidateKind.Sdk
 
 fun displayNameFor(name: String): String =
-    if (name == "java") "JDK" else name.split('-', '_')
-        .joinToString(" ") { part -> part.replaceFirstChar { it.titlecase() } }
+    if (name == "java") {
+        "JDK"
+    } else {
+        name
+            .split('-', '_')
+            .joinToString(" ") { part -> part.replaceFirstChar { it.titlecase() } }
+    }
 
-fun javaFeatureVersion(identifier: String?): String? =
-    identifier?.substringBefore('.')?.substringBefore('-')?.takeIf { it.isNotBlank() }
+fun javaFeatureVersion(identifier: String?): String? = identifier?.substringBefore('.')?.substringBefore('-')?.takeIf { it.isNotBlank() }
 
 fun javaProviderCode(identifier: String?): String? =
     identifier?.substringAfterLast('-', missingDelimiterValue = "")?.takeIf { it.isNotBlank() }
 
-fun javaProviderName(code: String?): String? =
-    code?.let { jdkVendorKnowledge(it)?.displayName ?: it }
+fun javaProviderName(code: String?): String? = code?.let { jdkVendorKnowledge(it)?.displayName ?: it }
 
 fun CandidateVersion.toJavaVersion(): JavaVersion {
     val providerCode = javaProviderCode(version)

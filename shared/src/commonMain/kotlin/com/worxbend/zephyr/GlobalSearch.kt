@@ -1,13 +1,15 @@
 package com.worxbend.zephyr
 
+import com.worxbend.zephyr.actions.ZephyrActionIds
+import com.worxbend.zephyr.actions.ZephyrActionRequest
 import com.worxbend.zephyr.domain.Candidate
 import com.worxbend.zephyr.domain.CandidateCatalogItem
 import com.worxbend.zephyr.domain.CandidateKind
 import com.worxbend.zephyr.viewmodel.ZephyrRoute
-import com.worxbend.zephyr.actions.ZephyrActionIds
-import com.worxbend.zephyr.actions.ZephyrActionRequest
 
-internal enum class GlobalSearchKind(val label: String) {
+internal enum class GlobalSearchKind(
+    val label: String,
+) {
     Page("Page"),
     Candidate("Candidate"),
     Version("Version"),
@@ -16,8 +18,13 @@ internal enum class GlobalSearchKind(val label: String) {
 }
 
 internal sealed interface GlobalSearchTarget {
-    data class Navigate(val route: ZephyrRoute) : GlobalSearchTarget
-    data class Execute(val request: ZephyrActionRequest) : GlobalSearchTarget
+    data class Navigate(
+        val route: ZephyrRoute,
+    ) : GlobalSearchTarget
+
+    data class Execute(
+        val request: ZephyrActionRequest,
+    ) : GlobalSearchTarget
 }
 
 internal data class GlobalSearchItem(
@@ -33,60 +40,63 @@ internal data class GlobalSearchItem(
 internal fun buildGlobalSearchIndex(
     candidates: List<Candidate>,
     catalog: List<CandidateCatalogItem>,
-): List<GlobalSearchItem> = buildList {
-    addPageItems()
-    addSettingItems()
-    addActionItems()
+): List<GlobalSearchItem> =
+    buildList {
+        addPageItems()
+        addSettingItems()
+        addActionItems()
 
-    val installedByName = candidates.associateBy(Candidate::name)
-    val catalogByName = catalog.associateBy(CandidateCatalogItem::name)
-    (installedByName.keys + catalogByName.keys)
-        .sorted()
-        .forEach { name ->
-            val installed = installedByName[name]
-            val remote = catalogByName[name]
-            val kind = installed?.kind ?: remote?.kind ?: CandidateKind.Sdk
-            val displayName = installed?.displayName ?: remote?.displayName ?: name
-            val installedCount = installed?.installedVersions?.count { it.isInstalled } ?: 0
-            val status = if (installed != null) {
-                "$installedCount installed version(s)"
-            } else {
-                "Available from SDKMAN"
+        val installedByName = candidates.associateBy(Candidate::name)
+        val catalogByName = catalog.associateBy(CandidateCatalogItem::name)
+        (installedByName.keys + catalogByName.keys)
+            .sorted()
+            .forEach { name ->
+                val installed = installedByName[name]
+                val remote = catalogByName[name]
+                val kind = installed?.kind ?: remote?.kind ?: CandidateKind.Sdk
+                val displayName = installed?.displayName ?: remote?.displayName ?: name
+                val installedCount = installed?.installedVersions?.count { it.isInstalled } ?: 0
+                val status =
+                    if (installed != null) {
+                        "$installedCount installed version(s)"
+                    } else {
+                        "Available from SDKMAN"
+                    }
+                add(
+                    GlobalSearchItem(
+                        id = "candidate:$name",
+                        title = displayName,
+                        subtitle = "${kind.searchLabel} • $status",
+                        kind = GlobalSearchKind.Candidate,
+                        target = GlobalSearchTarget.Navigate(kind.detailRoute(name)),
+                        terms = listOfNotNull(name, installed?.description, remote?.description, remote?.stableVersion),
+                    ),
+                )
             }
-            add(
-                GlobalSearchItem(
-                    id = "candidate:$name",
-                    title = displayName,
-                    subtitle = "${kind.searchLabel} • $status",
-                    kind = GlobalSearchKind.Candidate,
-                    target = GlobalSearchTarget.Navigate(kind.detailRoute(name)),
-                    terms = listOfNotNull(name, installed?.description, remote?.description, remote?.stableVersion),
-                ),
-            )
-        }
 
-    candidates.forEach { candidate ->
-        candidate.installedVersions.forEach { version ->
-            val states = buildList {
-                if (version.isDefault) add("Default")
-                if (version.isInstalled) add("Installed")
-                if (version.isRemoteAvailable) add("Available")
-                if (version.isConfirmedLocalOnly) add("Local-only")
-                if (!version.isRemoteAvailable && !version.isConfirmedLocalOnly) add("Availability unknown")
+        candidates.forEach { candidate ->
+            candidate.installedVersions.forEach { version ->
+                val states =
+                    buildList {
+                        if (version.isDefault) add("Default")
+                        if (version.isInstalled) add("Installed")
+                        if (version.isRemoteAvailable) add("Available")
+                        if (version.isConfirmedLocalOnly) add("Local-only")
+                        if (!version.isRemoteAvailable && !version.isConfirmedLocalOnly) add("Availability unknown")
+                    }
+                add(
+                    GlobalSearchItem(
+                        id = "version:${candidate.name}:${version.version}",
+                        title = version.version,
+                        subtitle = "${candidate.displayName} • ${states.joinToString(" • ")}",
+                        kind = GlobalSearchKind.Version,
+                        target = GlobalSearchTarget.Navigate(candidate.kind.detailRoute(candidate.name)),
+                        terms = listOf(candidate.name, candidate.displayName) + states,
+                    ),
+                )
             }
-            add(
-                GlobalSearchItem(
-                    id = "version:${candidate.name}:${version.version}",
-                    title = version.version,
-                    subtitle = "${candidate.displayName} • ${states.joinToString(" • ")}",
-                    kind = GlobalSearchKind.Version,
-                    target = GlobalSearchTarget.Navigate(candidate.kind.detailRoute(candidate.name)),
-                    terms = listOf(candidate.name, candidate.displayName) + states,
-                ),
-            )
         }
     }
-}
 
 internal fun searchGlobalIndex(
     items: List<GlobalSearchItem>,
@@ -101,8 +111,7 @@ internal fun searchGlobalIndex(
             compareBy<Pair<Int, GlobalSearchItem>> { it.first }
                 .thenBy { it.second.kind.ordinal }
                 .thenBy { it.second.title.lowercase() },
-        )
-        .take(limit)
+        ).take(limit)
         .map(Pair<Int, GlobalSearchItem>::second)
 }
 
@@ -168,34 +177,34 @@ private fun MutableList<GlobalSearchItem>.addActionItems() {
         CommandDefinition(
             "Refresh local state",
             "Reload installed SDKMAN candidates",
-            ZephyrActionRequest(ZephyrActionIds.RefreshInstalled),
+            ZephyrActionRequest(ZephyrActionIds.REFRESH_INSTALLED),
             "Ctrl/⌘ Shift R",
         ),
         CommandDefinition(
             "Scan local-only versions",
             "Audit installed versions against SDKMAN",
-            ZephyrActionRequest(ZephyrActionIds.ScanLocalOnly),
+            ZephyrActionRequest(ZephyrActionIds.SCAN_LOCAL_ONLY),
             "Ctrl/⌘ Shift L",
         ),
         CommandDefinition(
             "Check connectivity",
             "Probe SDKMAN service reachability",
-            ZephyrActionRequest(ZephyrActionIds.RefreshConnectivity),
+            ZephyrActionRequest(ZephyrActionIds.REFRESH_CONNECTIVITY),
         ),
         CommandDefinition(
             "Run connection diagnostics",
             "Diagnose the active direct or proxy SDKMAN route",
-            ZephyrActionRequest(ZephyrActionIds.RunDiagnostics),
+            ZephyrActionRequest(ZephyrActionIds.RUN_DIAGNOSTICS),
         ),
         CommandDefinition(
             "Refresh SDKMAN metadata",
             "Review a remote metadata refresh",
-            ZephyrActionRequest(ZephyrActionIds.RefreshMetadata),
+            ZephyrActionRequest(ZephyrActionIds.REFRESH_METADATA),
         ),
         CommandDefinition(
             "Check for SDKMAN updates",
             "Review an SDKMAN self-update check",
-            ZephyrActionRequest(ZephyrActionIds.CheckSdkmanUpdates),
+            ZephyrActionRequest(ZephyrActionIds.CHECK_SDKMAN_UPDATES),
         ),
     ).forEach { definition ->
         add(

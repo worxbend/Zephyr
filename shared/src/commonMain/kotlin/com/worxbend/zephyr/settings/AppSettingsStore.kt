@@ -19,15 +19,28 @@ import kotlinx.coroutines.withTimeoutOrNull
 sealed interface SettingsSaveStatus {
     val revision: Long
     val savedRevision: Long
+
     data object Loading : SettingsSaveStatus {
         override val revision = 0L
         override val savedRevision = 0L
     }
-    data class Dirty(override val revision: Long, override val savedRevision: Long) : SettingsSaveStatus
-    data class Saving(override val revision: Long, override val savedRevision: Long) : SettingsSaveStatus
-    data class Saved(override val revision: Long) : SettingsSaveStatus {
+
+    data class Dirty(
+        override val revision: Long,
+        override val savedRevision: Long,
+    ) : SettingsSaveStatus
+
+    data class Saving(
+        override val revision: Long,
+        override val savedRevision: Long,
+    ) : SettingsSaveStatus
+
+    data class Saved(
+        override val revision: Long,
+    ) : SettingsSaveStatus {
         override val savedRevision = revision
     }
+
     data class Failed(
         override val revision: Long,
         override val savedRevision: Long,
@@ -38,10 +51,18 @@ sealed interface SettingsSaveStatus {
 enum class SettingsFailureReason { Load, Save, Transform }
 
 sealed interface SettingsCloseResult {
-    data class Saved(val revision: Long) : SettingsCloseResult
-    data class Failed(val status: SettingsSaveStatus.Failed) : SettingsCloseResult
+    data class Saved(
+        val revision: Long,
+    ) : SettingsCloseResult
+
+    data class Failed(
+        val status: SettingsSaveStatus.Failed,
+    ) : SettingsCloseResult
+
     /** The writer may still finish its in-flight IO; no durable acknowledgement is implied. */
-    data class TimedOut(val status: SettingsSaveStatus) : SettingsCloseResult
+    data class TimedOut(
+        val status: SettingsSaveStatus,
+    ) : SettingsCloseResult
 }
 
 /** One application-owned writer; visible settings and durable save acknowledgements are separate. */
@@ -50,11 +71,22 @@ class AppSettingsStore(
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private sealed interface Request {
-        data class Update(val transform: (AppSettings) -> AppSettings) : Request
+        data class Update(
+            val transform: (AppSettings) -> AppSettings,
+        ) : Request
+
         data object Retry : Request
-        data class Close(val acknowledgement: CompletableDeferred<SettingsCloseResult>) : Request
+
+        data class Close(
+            val acknowledgement: CompletableDeferred<SettingsCloseResult>,
+        ) : Request
     }
-    private data class Admission(val open: Boolean = true, val submissions: Int = 0)
+
+    private data class Admission(
+        val open: Boolean = true,
+        val submissions: Int = 0,
+    )
+
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val requests = Channel<Request>(Channel.UNLIMITED)
     private val admission = MutableStateFlow(Admission())
@@ -75,13 +107,14 @@ class AppSettingsStore(
                     is Request.Update -> {
                         // A failed load is not permission to overwrite unreadable settings.
                         if (!loaded) continue
-                        val next = try {
-                            request.transform(_state.value)
-                        } catch (exception: Exception) {
-                            if (exception is CancellationException) throw exception
-                            fail(SettingsFailureReason.Transform, exception)
-                            continue
-                        }
+                        val next =
+                            try {
+                                request.transform(_state.value)
+                            } catch (exception: Exception) {
+                                if (exception is CancellationException) throw exception
+                                fail(SettingsFailureReason.Transform, exception)
+                                continue
+                            }
                         if (next != _state.value) {
                             revision++
                             _state.value = next
@@ -89,15 +122,25 @@ class AppSettingsStore(
                         }
                         if (revision != savedRevision) save()
                     }
+
                     Request.Retry -> {
-                        if (!loaded) load()
-                        else if (revision != savedRevision) save()
-                        else _saveStatus.value = SettingsSaveStatus.Saved(savedRevision)
+                        if (!loaded) {
+                            load()
+                        } else if (revision != savedRevision) {
+                            save()
+                        } else {
+                            _saveStatus.value = SettingsSaveStatus.Saved(savedRevision)
+                        }
                     }
+
                     is Request.Close -> {
                         val failure = _saveStatus.value as? SettingsSaveStatus.Failed
-                        val result = if (failure != null) SettingsCloseResult.Failed(failure)
-                            else SettingsCloseResult.Saved(savedRevision)
+                        val result =
+                            if (failure != null) {
+                                SettingsCloseResult.Failed(failure)
+                            } else {
+                                SettingsCloseResult.Saved(savedRevision)
+                            }
                         if (!request.acknowledgement.isCancelled && result is SettingsCloseResult.Saved) {
                             requests.close()
                             request.acknowledgement.complete(result)
@@ -133,14 +176,15 @@ class AppSettingsStore(
         require(timeoutMillis > 0) { "Settings close timeout must be positive." }
         val acknowledgement = beginClose()
         if (acknowledgement.isCancelled) return SettingsCloseResult.TimedOut(_saveStatus.value)
-        val result = try {
-            withTimeoutOrNull(timeoutMillis) { acknowledgement.await() }
-        } catch (exception: CancellationException) {
-            // A concurrent closer may have timed out the shared acknowledgement, not this caller.
-            kotlin.coroutines.coroutineContext.ensureActive()
-            if (acknowledgement.isCancelled) return SettingsCloseResult.TimedOut(_saveStatus.value)
-            throw exception
-        }
+        val result =
+            try {
+                withTimeoutOrNull(timeoutMillis) { acknowledgement.await() }
+            } catch (exception: CancellationException) {
+                // A concurrent closer may have timed out the shared acknowledgement, not this caller.
+                kotlin.coroutines.coroutineContext.ensureActive()
+                if (acknowledgement.isCancelled) return SettingsCloseResult.TimedOut(_saveStatus.value)
+                throw exception
+            }
         if (result != null) return result
         acknowledgement.cancel()
         return SettingsCloseResult.TimedOut(_saveStatus.value)
@@ -208,7 +252,10 @@ class AppSettingsStore(
         }
     }
 
-    private fun fail(reason: SettingsFailureReason, exception: Exception) {
+    private fun fail(
+        reason: SettingsFailureReason,
+        exception: Exception,
+    ) {
         _saveStatus.value = SettingsSaveStatus.Failed(revision, savedRevision, reason)
         ZephyrLogger.warn("Application settings ${reason.name.lowercase()} failed.", exception)
     }

@@ -6,11 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class JavaVersionPresentationTest {
-    private val versions = listOf(
-        javaVersion("21.0.5-tem", "21", "Eclipse Temurin"),
-        javaVersion("21.0.4-zulu", "21", "Azul Zulu"),
-        javaVersion("17.0.13-tem", "17", "Eclipse Temurin"),
-    )
+    private val versions =
+        listOf(
+            javaVersion("21.0.5-tem", "21", "Eclipse Temurin"),
+            javaVersion("21.0.4-zulu", "21", "Azul Zulu"),
+            javaVersion("17.0.13-tem", "17", "Eclipse Temurin"),
+        )
 
     @Test
     fun filtersByIdentifierFeatureVersionAndProvider() {
@@ -32,7 +33,11 @@ class JavaVersionPresentationTest {
         assertEquals(mapOf("" to versions), versions.groupBy(JavaVersionGrouping.None))
     }
 
-    private fun javaVersion(identifier: String, featureVersion: String, providerName: String) = JavaVersion(
+    private fun javaVersion(
+        identifier: String,
+        featureVersion: String,
+        providerName: String,
+    ) = JavaVersion(
         identifier = identifier,
         featureVersion = featureVersion,
         providerCode = null,

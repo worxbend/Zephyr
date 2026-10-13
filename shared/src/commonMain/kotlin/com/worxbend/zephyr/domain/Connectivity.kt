@@ -1,18 +1,24 @@
 package com.worxbend.zephyr.domain
 
-enum class ConnectivityState(val label: String) {
+enum class ConnectivityState(
+    val label: String,
+) {
     Unknown("Unknown"),
     Checking("Checking"),
     Online("Online"),
     Offline("Offline"),
 }
 
-enum class ConnectivityRouteKind(val label: String) {
+enum class ConnectivityRouteKind(
+    val label: String,
+) {
     Direct("Direct"),
     Proxy("Proxy"),
 }
 
-enum class ConnectivityOutcome(val label: String) {
+enum class ConnectivityOutcome(
+    val label: String,
+) {
     Online("Online"),
     ProxyAuthentication("Proxy authentication required"),
     Tls("TLS failure"),
@@ -64,27 +70,38 @@ data class ConnectivityStatus(
     }
 }
 
-fun boundedConnectivityLatencyMillis(elapsedMillis: Long): Long =
-    elapsedMillis.coerceIn(0, MAX_CONNECTIVITY_LATENCY_MILLIS)
+fun boundedConnectivityLatencyMillis(elapsedMillis: Long): Long = elapsedMillis.coerceIn(0, MAX_CONNECTIVITY_LATENCY_MILLIS)
 
 const val MAX_CONNECTIVITY_LATENCY_MILLIS: Long = 120_000
 
 val SdkmanTransaction.requiresNetwork: Boolean
-    get() = when (this) {
-        is SdkmanTransaction.Install,
-        is SdkmanTransaction.BatchInstall,
-        is SdkmanTransaction.CleanLocalOnly,
-        SdkmanTransaction.RefreshMetadata,
-        SdkmanTransaction.SelfUpdate,
-        -> true
-        is SdkmanTransaction.SnapshotRestore ->
-            commands.any { it.action == SdkmanCommandAction.Install }
-        is SdkmanTransaction.ToolchainActivation ->
-            commands.any { it.action == SdkmanCommandAction.Install }
-        is SdkmanTransaction.UpdateActivation ->
-            commands.any { it.action == SdkmanCommandAction.Install }
-        is SdkmanTransaction.Uninstall,
-        is SdkmanTransaction.BatchUninstall,
-        is SdkmanTransaction.SetDefault,
-        -> false
-    }
+    get() =
+        when (this) {
+            is SdkmanTransaction.Install,
+            is SdkmanTransaction.BatchInstall,
+            is SdkmanTransaction.CleanLocalOnly,
+            SdkmanTransaction.RefreshMetadata,
+            SdkmanTransaction.SelfUpdate,
+            -> {
+                true
+            }
+
+            is SdkmanTransaction.SnapshotRestore -> {
+                commands.any { it.action == SdkmanCommandAction.Install }
+            }
+
+            is SdkmanTransaction.ToolchainActivation -> {
+                commands.any { it.action == SdkmanCommandAction.Install }
+            }
+
+            is SdkmanTransaction.UpdateActivation -> {
+                commands.any { it.action == SdkmanCommandAction.Install }
+            }
+
+            is SdkmanTransaction.Uninstall,
+            is SdkmanTransaction.BatchUninstall,
+            is SdkmanTransaction.SetDefault,
+            -> {
+                false
+            }
+        }

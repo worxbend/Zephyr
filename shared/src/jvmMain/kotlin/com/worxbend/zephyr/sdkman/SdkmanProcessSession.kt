@@ -1,21 +1,21 @@
 package com.worxbend.zephyr.sdkman
 
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
-import kotlin.coroutines.resume
-import kotlin.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
+import kotlin.coroutines.resume
+import kotlin.time.Duration
 
 /**
  * One launch, tree, output and cleanup owner. Cancellation only publishes a flag;
@@ -36,14 +36,21 @@ internal class SdkmanProcessSession(
     private val launchFinished = AtomicBoolean()
     private val stopped = CompletableDeferred<Unit>()
 
-    suspend fun execute(arguments: List<String>, environment: Map<String, String>, timeout: Duration): SdkmanCommandResult {
+    suspend fun execute(
+        arguments: List<String>,
+        environment: Map<String, String>,
+        timeout: Duration,
+    ): SdkmanCommandResult {
         require(timeout.isPositive() && timeout.isFinite()) { "Command timeout must be positive and finite." }
         val stdout = SessionOutput()
         val stderr = SessionOutput()
         val grouped = isolatedGroup
         val portableArguments = listOf("/bin/bash", "--noprofile", "--norc", "-c", PORTABLE_GROUP_WRAPPER, "zephyr-session") + arguments
         val builder = ProcessBuilder(if (grouped) listOf("/usr/bin/setsid", "--") + arguments else portableArguments)
-        builder.environment().apply { clear(); putAll(environment) }
+        builder.environment().apply {
+            clear()
+            putAll(environment)
+        }
         val started = System.nanoTime()
         try {
             return suspendCancellableCoroutine { continuation ->
@@ -117,20 +124,23 @@ internal class SdkmanProcessSession(
                             val remaining = drainDeadline - System.nanoTime()
                             if (remaining > 0) reader.join(TimeUnit.NANOSECONDS.toMillis(remaining).coerceAtLeast(1))
                         }
-                        val messages = buildList {
-                            stderr.text().takeIf(String::isNotBlank)?.let(::add)
-                            if (timedOut) add("Command timed out after $timeout.")
-                            if (stdout.truncated || stderr.truncated) add("Command output was truncated.")
-                            if (pumps.any(Thread::isAlive)) add("Command output draining exceeded its cleanup deadline.")
-                            if (failure != null) add("Command could not be launched or completed.")
-                        }
+                        val messages =
+                            buildList {
+                                stderr.text().takeIf(String::isNotBlank)?.let(::add)
+                                if (timedOut) add("Command timed out after $timeout.")
+                                if (stdout.truncated || stderr.truncated) add("Command output was truncated.")
+                                if (pumps.any(Thread::isAlive)) add("Command output draining exceeded its cleanup deadline.")
+                                if (failure != null) add("Command could not be launched or completed.")
+                            }
                         stopped.complete(Unit)
-                        continuation.resume(SdkmanCommandResult(
-                            exitCode = if (timedOut) -1 else exitCode,
-                            stdout = stdout.text(),
-                            stderr = messages.joinToString("\n"),
-                            timedOut = timedOut,
-                        ))
+                        continuation.resume(
+                            SdkmanCommandResult(
+                                exitCode = if (timedOut) -1 else exitCode,
+                                stdout = stdout.text(),
+                                stderr = messages.joinToString("\n"),
+                                timedOut = timedOut,
+                            ),
+                        )
                     }
                 }
             }
@@ -142,7 +152,11 @@ internal class SdkmanProcessSession(
         }
     }
 
-    private fun terminate(running: Process, grouped: Boolean, observed: Set<ProcessHandle>) {
+    private fun terminate(
+        running: Process,
+        grouped: Boolean,
+        observed: Set<ProcessHandle>,
+    ) {
         if (!cleanupStarted.compareAndSet(false, true)) return
         val handles = observed.toMutableSet()
         runCatching { running.toHandle().descendants().use { it.forEach(handles::add) } }
@@ -159,14 +173,19 @@ internal class SdkmanProcessSession(
         running.waitFor(75, TimeUnit.MILLISECONDS)
     }
 
-    private fun signalGroup(pid: Long, signal: String) {
+    private fun signalGroup(
+        pid: Long,
+        signal: String,
+    ) {
         val finished = CountDownLatch(1)
         thread(name = "zephyr-process-signal", isDaemon = true) {
             try {
                 runCatching {
-                    val kill = ProcessBuilder("/bin/kill", "-$signal", "--", "-$pid")
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                        .redirectError(ProcessBuilder.Redirect.DISCARD).start()
+                    val kill =
+                        ProcessBuilder("/bin/kill", "-$signal", "--", "-$pid")
+                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
+                            .start()
                     if (!kill.waitFor(50, TimeUnit.MILLISECONDS)) kill.destroyForcibly()
                 }
             } finally {
@@ -176,7 +195,10 @@ internal class SdkmanProcessSession(
         finished.await(50, TimeUnit.MILLISECONDS)
     }
 
-    private fun pump(input: InputStream, output: SessionOutput): Thread =
+    private fun pump(
+        input: InputStream,
+        output: SessionOutput,
+    ): Thread =
         thread(name = "zephyr-process-output", isDaemon = true) {
             runCatching {
                 val buffer = ByteArray(8192)
@@ -192,7 +214,8 @@ internal class SdkmanProcessSession(
 // Bash's job control starts the command in its own group, so its EXIT trap
 // cleans inherited-pipe holders even after the command leader has exited.
 // kill is a Bash builtin: this fallback requires no native signal subprocess.
-private val PORTABLE_GROUP_WRAPPER = """
+private val PORTABLE_GROUP_WRAPPER =
+    """
     set -m
     child=''
     trap 'exit 143' TERM INT
@@ -201,14 +224,18 @@ private val PORTABLE_GROUP_WRAPPER = """
     child=${'$'}!
     wait "${'$'}child"
     exit ${'$'}?
-""".trimIndent()
+    """.trimIndent()
 
 private class SessionOutput {
     private val bytes = ByteArrayOutputStream()
+
     @Volatile var truncated = false
         private set
 
-    @Synchronized fun append(buffer: ByteArray, count: Int) {
+    @Synchronized fun append(
+        buffer: ByteArray,
+        count: Int,
+    ) {
         val writable = count.coerceAtMost((1_048_576 - bytes.size()).coerceAtLeast(0))
         bytes.write(buffer, 0, writable)
         if (writable < count) truncated = true

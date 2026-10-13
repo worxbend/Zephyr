@@ -11,27 +11,30 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class GlobalSearchTest {
-    private val java = Candidate(
-        name = "java",
-        displayName = "Java",
-        kind = CandidateKind.Jdk,
-        installedVersions = listOf(
-            CandidateVersion("21.0.5-tem", true, true, true),
-        ),
-        defaultVersion = "21.0.5-tem",
-        hasLocalOnlyVersions = false,
-        localOnlyVersionCount = 0,
-        localOnlyVersions = emptyList(),
-    )
-    private val gradle = CandidateCatalogItem(
-        name = "gradle",
-        displayName = "Gradle",
-        stableVersion = "8.14",
-        description = "Build automation",
-        websiteUrl = null,
-        kind = CandidateKind.Sdk,
-        isInstalled = false,
-    )
+    private val java =
+        Candidate(
+            name = "java",
+            displayName = "Java",
+            kind = CandidateKind.Jdk,
+            installedVersions =
+                listOf(
+                    CandidateVersion("21.0.5-tem", true, true, true),
+                ),
+            defaultVersion = "21.0.5-tem",
+            hasLocalOnlyVersions = false,
+            localOnlyVersionCount = 0,
+            localOnlyVersions = emptyList(),
+        )
+    private val gradle =
+        CandidateCatalogItem(
+            name = "gradle",
+            displayName = "Gradle",
+            stableVersion = "8.14",
+            description = "Build automation",
+            websiteUrl = null,
+            kind = CandidateKind.Sdk,
+            isInstalled = false,
+        )
 
     @Test
     fun indexesCandidatesVersionsSettingsAndActions() {

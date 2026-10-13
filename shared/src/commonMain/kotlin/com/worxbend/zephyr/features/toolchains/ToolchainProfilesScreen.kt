@@ -40,17 +40,19 @@ internal fun ToolchainProfilesScreen(
 ) {
     val metrics = LocalZephyrMetrics.current
     var profileName by remember { mutableStateOf("") }
-    val currentDefaults = state.candidates.mapNotNull { candidate ->
-        candidate.defaultVersion?.let { InstallTarget(candidate.name, it) }
-    }
+    val currentDefaults =
+        state.candidates.mapNotNull { candidate ->
+            candidate.defaultVersion?.let { InstallTarget(candidate.name, it) }
+        }
     val saveProfile: (String) -> Unit = { name ->
         val profile = ToolchainProfile(name.trim(), currentDefaults)
         onSettingsChange {
             it.copy(
-                toolchainProfiles = (
-                    it.toolchainProfiles.filterNot { existing ->
-                        existing.name.equals(profile.name, ignoreCase = true)
-                    } + profile
+                toolchainProfiles =
+                    (
+                        it.toolchainProfiles.filterNot { existing ->
+                            existing.name.equals(profile.name, ignoreCase = true)
+                        } + profile
                     ).sortedBy { saved -> saved.name.lowercase() },
             )
         }
@@ -184,10 +186,11 @@ internal fun ToolchainProfilesScreen(
                         ) {
                             profile.targets.forEach { target ->
                                 val current = state.candidates.firstOrNull { it.name == target.candidate }
-                                val installed = current
-                                    ?.installedVersions
-                                    .orEmpty()
-                                    .any { it.isInstalled && it.version == target.version }
+                                val installed =
+                                    current
+                                        ?.installedVersions
+                                        .orEmpty()
+                                        .any { it.isInstalled && it.version == target.version }
                                 val isDefault = current?.defaultVersion == target.version
                                 Badge(
                                     "${target.candidate} ${target.version}",

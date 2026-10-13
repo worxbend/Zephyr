@@ -1,8 +1,8 @@
 package com.worxbend.zephyr.data
 
 import com.worxbend.zephyr.sdkman.ApacheCommonsSdkmanCommandRunner
-import com.worxbend.zephyr.sdkman.JvmSdkmanRepository
 import com.worxbend.zephyr.sdkman.JvmCandidateMetadataCacheStore
+import com.worxbend.zephyr.sdkman.JvmSdkmanRepository
 import com.worxbend.zephyr.sdkman.PreferencesProtectedVersionStore
 import okio.FileSystem
 import okio.Path.Companion.toPath

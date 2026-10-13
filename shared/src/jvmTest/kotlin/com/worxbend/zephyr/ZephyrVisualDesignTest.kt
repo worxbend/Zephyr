@@ -55,8 +55,8 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.width
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import com.worxbend.zephyr.settings.MotionPreference
 import com.worxbend.zephyr.settings.TextScale
 import com.worxbend.zephyr.settings.ThemePreference
@@ -115,148 +115,165 @@ class ZephyrVisualDesignTest {
     }
 
     @Test
-    fun narrowSettingsAtTwoHundredPercentRemainVisibleAndSelectableInLightTheme() =
-        checkLargeTextSettings(dark = false)
+    fun narrowSettingsAtTwoHundredPercentRemainVisibleAndSelectableInLightTheme() = checkLargeTextSettings(dark = false)
 
     @Test
-    fun narrowSettingsAtTwoHundredPercentRemainVisibleAndSelectableInDarkTheme() =
-        checkLargeTextSettings(dark = true)
+    fun narrowSettingsAtTwoHundredPercentRemainVisibleAndSelectableInDarkTheme() = checkLargeTextSettings(dark = true)
 
-    private fun checkLargeTextSettings(dark: Boolean) = runDesktopComposeUiTest(width = 360, height = 900) {
-        setContent {
-            ZephyrTheme(darkTheme = dark, textScale = TextScale.Percent200, reducedMotion = true) {
-                FixtureSurface {
-                    TestAppearanceSettings()
+    private fun checkLargeTextSettings(dark: Boolean) =
+        runDesktopComposeUiTest(width = 360, height = 900) {
+            setContent {
+                ZephyrTheme(darkTheme = dark, textScale = TextScale.Percent200, reducedMotion = true) {
+                    FixtureSurface {
+                        TestAppearanceSettings()
+                    }
                 }
             }
-        }
-        val groups = listOf(
-            "test-theme" to ThemePreference.entries.map { it.label },
-            "test-density" to UiDensity.entries.map { it.label },
-            "test-scale" to TextScale.entries.map { it.label },
-            "test-motion" to MotionPreference.entries.map { it.label },
-        )
-        groups.forEach { (tag, options) ->
-            options.forEach { label ->
-                val option = onNode(hasText(label) and hasAnyAncestor(hasTestTag(tag)))
-                option.performScrollTo().assertIsDisplayed().assertHasClickAction()
-                    .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
-                assertFullyVisible(option)
-                // A node can be in the viewport while its glyphs are ellipsized or clipped.
-                val layouts = mutableListOf<TextLayoutResult>()
-                onNode(
-                    hasText(label) and hasAnyAncestor(hasTestTag(tag)),
-                    useUnmergedTree = true,
-                ).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                    assertTrue(action(layouts))
+            val groups =
+                listOf(
+                    "test-theme" to ThemePreference.entries.map { it.label },
+                    "test-density" to UiDensity.entries.map { it.label },
+                    "test-scale" to TextScale.entries.map { it.label },
+                    "test-motion" to MotionPreference.entries.map { it.label },
+                )
+            groups.forEach { (tag, options) ->
+                options.forEach { label ->
+                    val option = onNode(hasText(label) and hasAnyAncestor(hasTestTag(tag)))
+                    option
+                        .performScrollTo()
+                        .assertIsDisplayed()
+                        .assertHasClickAction()
+                        .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+                    assertFullyVisible(option)
+                    // A node can be in the viewport while its glyphs are ellipsized or clipped.
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    onNode(
+                        hasText(label) and hasAnyAncestor(hasTestTag(tag)),
+                        useUnmergedTree = true,
+                    ).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                        assertTrue(action(layouts))
+                    }
+                    assertTrue(layouts.isNotEmpty(), "Missing text layout for $tag/$label")
+                    layouts.forEach { layout ->
+                        assertFalse(layout.didOverflowHeight, "$tag/$label clips vertically at 200%")
+                        // Desktop semantics can retain the full paragraph constraint width even
+                        // when the Text node wraps its content. Check painted line extents instead.
+                        repeat(layout.lineCount) { line ->
+                            assertFalse(layout.isLineEllipsized(line), "$tag/$label is ellipsized")
+                            assertTrue(
+                                layout.getLineLeft(line) >= -1f && layout.getLineRight(line) <= layout.size.width + 1f,
+                                "$tag/$label clips horizontally at 200%",
+                            )
+                        }
+                    }
+                    option.performClick().assertIsSelected()
+                    options.filterNot { it == label }.forEach { other ->
+                        onNode(hasText(other) and hasAnyAncestor(hasTestTag(tag))).assertIsNotSelected()
+                    }
                 }
-                assertTrue(layouts.isNotEmpty(), "Missing text layout for $tag/$label")
-                layouts.forEach { layout ->
-                    assertFalse(layout.didOverflowHeight, "$tag/$label clips vertically at 200%")
-                    // Desktop semantics can retain the full paragraph constraint width even
-                    // when the Text node wraps its content. Check painted line extents instead.
-                    repeat(layout.lineCount) { line ->
-                        assertFalse(layout.isLineEllipsized(line), "$tag/$label is ellipsized")
-                        assertTrue(
-                            layout.getLineLeft(line) >= -1f && layout.getLineRight(line) <= layout.size.width + 1f,
-                            "$tag/$label clips horizontally at 200%",
+            }
+            onNodeWithText("TEST appearance").performScrollTo()
+            waitForIdle()
+            savePng(onNodeWithTag("test-surface").captureToImage(), "settings-${themeName(dark)}-360-font200")
+        }
+
+    @Test
+    fun disabledToolbarCannotActivateAndKeyboardFocusSkipsIt() =
+        runDesktopComposeUiTest {
+            var firstClicks = 0
+            var disabledClicks = 0
+            var lastClicks = 0
+            setContent {
+                ZephyrTheme(darkTheme = false, reducedMotion = true) {
+                    Column {
+                        ZephyrToolbarButton("TEST first", { firstClicks++ }, Modifier.testTag("test-first"))
+                        ZephyrToolbarButton(
+                            "TEST disabled",
+                            { disabledClicks++ },
+                            Modifier.testTag("test-disabled"),
+                            enabled = false,
                         )
-                    }
-                }
-                option.performClick().assertIsSelected()
-                options.filterNot { it == label }.forEach { other ->
-                    onNode(hasText(other) and hasAnyAncestor(hasTestTag(tag))).assertIsNotSelected()
-                }
-            }
-        }
-        onNodeWithText("TEST appearance").performScrollTo()
-        waitForIdle()
-        savePng(onNodeWithTag("test-surface").captureToImage(), "settings-${themeName(dark)}-360-font200")
-    }
-
-    @Test
-    fun disabledToolbarCannotActivateAndKeyboardFocusSkipsIt() = runDesktopComposeUiTest {
-        var firstClicks = 0
-        var disabledClicks = 0
-        var lastClicks = 0
-        setContent {
-            ZephyrTheme(darkTheme = false, reducedMotion = true) {
-                Column {
-                    ZephyrToolbarButton("TEST first", { firstClicks++ }, Modifier.testTag("test-first"))
-                    ZephyrToolbarButton(
-                        "TEST disabled",
-                        { disabledClicks++ },
-                        Modifier.testTag("test-disabled"),
-                        enabled = false,
-                    )
-                    ZephyrToolbarButton("TEST last", { lastClicks++ }, Modifier.testTag("test-last"))
-                }
-            }
-        }
-        val first = onNodeWithTag("test-first")
-        val disabled = onNodeWithTag("test-disabled")
-        val last = onNodeWithTag("test-last")
-        disabled.assertIsNotEnabled()
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .performClick()
-        runOnIdle { assertEquals(0, disabledClicks, "A disabled pointer click invoked its callback") }
-        first.assertIsEnabled().assertHasClickAction().requestFocus().assertIsFocused()
-        first.performKeyInput { pressKey(Key.Tab) }
-        disabled.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
-        last.assertIsFocused().performKeyInput { pressKey(Key.Enter) }
-        runOnIdle { assertEquals(1, lastClicks, "Enter must activate the keyboard-focused toolbar button") }
-        last.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
-        first.assertIsFocused().performKeyInput { pressKey(Key.Spacebar) }
-        runOnIdle {
-            assertEquals(1, firstClicks, "Space must activate the keyboard-focused toolbar button")
-            assertEquals(0, disabledClicks)
-        }
-    }
-
-    @Test
-    fun symbolicHeaderActionsAreLabelledKeyboardOperableAndRespectDisabledState() = runDesktopComposeUiTest {
-        var clicks = 0
-        var disabledClicks = 0
-        setContent {
-            ZephyrTheme(darkTheme = false, reducedMotion = true) {
-                Column {
-                    ZephyrHeaderButton("Search", ZephyrIcon.Search, { clicks++ }, Modifier.testTag("header-search"))
-                    ZephyrHeaderButton("Disabled", ZephyrIcon.Refresh, { disabledClicks++ }, Modifier.testTag("header-disabled"), enabled = false)
-                    ZephyrHeaderButton("Activity", ZephyrIcon.Activity, {}, Modifier.testTag("header-activity"), badge = "3")
-                }
-            }
-        }
-        val search = onNodeWithTag("header-search")
-        val disabled = onNodeWithTag("header-disabled")
-        val activity = onNodeWithTag("header-activity")
-        search.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Search")))
-        activity.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Activity, 3 unread")))
-        disabled.assertIsNotEnabled().performClick()
-        search.requestFocus().assertIsFocused().performKeyInput { pressKey(Key.Enter) }
-        search.performKeyInput { pressKey(Key.Tab) }
-        activity.assertIsFocused()
-        activity.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
-        search.assertIsFocused().performKeyInput { pressKey(Key.Spacebar) }
-        runOnIdle {
-            assertEquals(2, clicks)
-            assertEquals(0, disabledClicks)
-        }
-    }
-
-    @Test
-    fun longDesktopPagesRemainScrollableAtLargeTextSizes() = runDesktopComposeUiTest(width = 800, height = 600) {
-        setContent {
-            ZephyrTheme(darkTheme = true, textScale = TextScale.Percent200, reducedMotion = true) {
-                ZephyrScrollPane(Modifier.fillMaxSize()) {
-                    repeat(20) { index ->
-                        ZephyrToolbarButton("TEST row $index", {}, suggested = index == 19)
+                        ZephyrToolbarButton("TEST last", { lastClicks++ }, Modifier.testTag("test-last"))
                     }
                 }
             }
+            val first = onNodeWithTag("test-first")
+            val disabled = onNodeWithTag("test-disabled")
+            val last = onNodeWithTag("test-last")
+            disabled
+                .assertIsNotEnabled()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .performClick()
+            runOnIdle { assertEquals(0, disabledClicks, "A disabled pointer click invoked its callback") }
+            first
+                .assertIsEnabled()
+                .assertHasClickAction()
+                .requestFocus()
+                .assertIsFocused()
+            first.performKeyInput { pressKey(Key.Tab) }
+            disabled.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+            last.assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+            runOnIdle { assertEquals(1, lastClicks, "Enter must activate the keyboard-focused toolbar button") }
+            last.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
+            first.assertIsFocused().performKeyInput { pressKey(Key.Spacebar) }
+            runOnIdle {
+                assertEquals(1, firstClicks, "Space must activate the keyboard-focused toolbar button")
+                assertEquals(0, disabledClicks)
+            }
         }
-        onNodeWithText("TEST row 19").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        onNodeWithText("TEST row 0").performScrollTo().assertIsDisplayed()
-    }
+
+    @Test
+    fun symbolicHeaderActionsAreLabelledKeyboardOperableAndRespectDisabledState() =
+        runDesktopComposeUiTest {
+            var clicks = 0
+            var disabledClicks = 0
+            setContent {
+                ZephyrTheme(darkTheme = false, reducedMotion = true) {
+                    Column {
+                        ZephyrHeaderButton("Search", ZephyrIcon.Search, { clicks++ }, Modifier.testTag("header-search"))
+                        ZephyrHeaderButton(
+                            "Disabled",
+                            ZephyrIcon.Refresh,
+                            { disabledClicks++ },
+                            Modifier.testTag("header-disabled"),
+                            enabled = false,
+                        )
+                        ZephyrHeaderButton("Activity", ZephyrIcon.Activity, {}, Modifier.testTag("header-activity"), badge = "3")
+                    }
+                }
+            }
+            val search = onNodeWithTag("header-search")
+            val disabled = onNodeWithTag("header-disabled")
+            val activity = onNodeWithTag("header-activity")
+            search.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Search")))
+            activity.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Activity, 3 unread")))
+            disabled.assertIsNotEnabled().performClick()
+            search.requestFocus().assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+            search.performKeyInput { pressKey(Key.Tab) }
+            activity.assertIsFocused()
+            activity.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) } }
+            search.assertIsFocused().performKeyInput { pressKey(Key.Spacebar) }
+            runOnIdle {
+                assertEquals(2, clicks)
+                assertEquals(0, disabledClicks)
+            }
+        }
+
+    @Test
+    fun longDesktopPagesRemainScrollableAtLargeTextSizes() =
+        runDesktopComposeUiTest(width = 800, height = 600) {
+            setContent {
+                ZephyrTheme(darkTheme = true, textScale = TextScale.Percent200, reducedMotion = true) {
+                    ZephyrScrollPane(Modifier.fillMaxSize()) {
+                        repeat(20) { index ->
+                            ZephyrToolbarButton("TEST row $index", {}, suggested = index == 19)
+                        }
+                    }
+                }
+            }
+            onNodeWithText("TEST row 19").performScrollTo().assertIsDisplayed().assertHasClickAction()
+            onNodeWithText("TEST row 0").performScrollTo().assertIsDisplayed()
+        }
 
     @Test
     fun renderedScrollbarThumbHasNonTextContrastInBothThemes() {
@@ -276,8 +293,9 @@ class ZephyrVisualDesignTest {
                 val thumb = pixels[pixels.width - 4, 20]
                 val track = pixels[pixels.width - 4, pixels.height - 20]
                 assertEquals(colors.onSurfaceVariant, thumb, "Sample must be inside the opaque idle thumb")
-                val contrast = (maxOf(thumb.luminance(), track.luminance()) + 0.05f) /
-                    (minOf(thumb.luminance(), track.luminance()) + 0.05f)
+                val contrast =
+                    (maxOf(thumb.luminance(), track.luminance()) + 0.05f) /
+                        (minOf(thumb.luminance(), track.luminance()) + 0.05f)
                 assertTrue(contrast >= 3f, "Scrollbar contrast is $contrast in ${themeName(dark)} mode")
             }
         }
@@ -295,7 +313,10 @@ class ZephyrVisualDesignTest {
     @Test
     fun darkWideControlsCardAndSettingsScreenshot() = captureFixture(dark = true, width = 1200)
 
-    private fun captureFixture(dark: Boolean, width: Int) = runDesktopComposeUiTest(width = width, height = 1200) {
+    private fun captureFixture(
+        dark: Boolean,
+        width: Int,
+    ) = runDesktopComposeUiTest(width = width, height = 1200) {
         setContent {
             ZephyrTheme(darkTheme = dark, reducedMotion = true) {
                 FixtureSurface {
@@ -365,7 +386,13 @@ private fun TestAppearanceSettings() {
         Column(Modifier.padding(12.dp)) {
             Text("TEST appearance", style = MaterialTheme.typography.titleMedium)
             ZephyrSettingsRow("TEST theme", "TEST choose an appearance.") {
-                ZephyrSegmentedControl(ThemePreference.entries, theme, ThemePreference::label, { theme = it }, Modifier.testTag("test-theme"))
+                ZephyrSegmentedControl(
+                    ThemePreference.entries,
+                    theme,
+                    ThemePreference::label,
+                    { theme = it },
+                    Modifier.testTag("test-theme"),
+                )
             }
             ZephyrSettingsRow("TEST density", "TEST spacing preference.") {
                 ZephyrSegmentedControl(UiDensity.entries, density, UiDensity::label, { density = it }, Modifier.testTag("test-density"))
@@ -375,13 +402,23 @@ private fun TestAppearanceSettings() {
                 ZephyrSegmentedControl(TextScale.entries, scale, TextScale::label, { scale = it }, Modifier.testTag("test-scale"))
             }
             ZephyrSettingsRow("TEST motion", "TEST animation preference.") {
-                ZephyrSegmentedControl(MotionPreference.entries, motion, MotionPreference::label, { motion = it }, Modifier.testTag("test-motion"))
+                ZephyrSegmentedControl(
+                    MotionPreference.entries,
+                    motion,
+                    MotionPreference::label,
+                    { motion = it },
+                    Modifier.testTag("test-motion"),
+                )
             }
         }
     }
 }
 
-private fun assertContrast(name: String, foreground: Color, background: Color) {
+private fun assertContrast(
+    name: String,
+    foreground: Color,
+    background: Color,
+) {
     assertEquals(1f, foreground.alpha, "$name foreground must be opaque for this contrast assertion")
     assertEquals(1f, background.alpha, "$name background must be opaque for this contrast assertion")
     val lighter = maxOf(foreground.luminance(), background.luminance())
@@ -403,10 +440,14 @@ private fun themeName(dark: Boolean): String = if (dark) "dark" else "light"
 
 private fun ImageBitmap.pixels(): IntArray = IntArray(width * height).also { readPixels(it) }
 
-private fun savePng(image: ImageBitmap, name: String) {
+private fun savePng(
+    image: ImageBitmap,
+    name: String,
+) {
     // Gradle's test working directory is normally shared/, but also support invocation from repo root.
-    val repo = generateSequence(Path.of("").toAbsolutePath()) { it.parent }
-        .firstOrNull { Files.isDirectory(it.resolve("shared/src")) }
+    val repo =
+        generateSequence(Path.of("").toAbsolutePath()) { it.parent }
+            .firstOrNull { Files.isDirectory(it.resolve("shared/src")) }
     val root = assertNotNull(repo, "Cannot locate Zephyr's shared/ directory for test reports")
     val directory = root.resolve("shared/build/reports/visual-design")
     Files.createDirectories(directory)

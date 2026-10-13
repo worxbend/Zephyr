@@ -40,11 +40,14 @@ internal fun InstalledJdkScreen(
     var grouping by remember { mutableStateOf(JavaVersionGrouping.None) }
     var terminalMessage by remember { mutableStateOf<String?>(null) }
     val terminalLauncher = LocalAppServices.current.terminalLauncher
-    val installed = jdk?.installedVersions.orEmpty()
-        .asSequence()
-        .filter { it.isInstalled }
-        .map { it.toJavaVersion() }
-        .toList()
+    val installed =
+        jdk
+            ?.installedVersions
+            .orEmpty()
+            .asSequence()
+            .filter { it.isInstalled }
+            .map { it.toJavaVersion() }
+            .toList()
     val filtered = installed.filterByQuery(query)
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
         PageTitle("Installed JDK", "${installed.size} local Java version(s) managed by SDKMAN.")
@@ -96,13 +99,15 @@ internal fun InstalledJdkScreen(
                         onToggleProtected = { onProtectionChange("java", version.identifier, !protected) },
                         onClean = { onClean("java", listOf(version.identifier)) },
                         cleanupEligible = jdk != null && version.identifier in trustedCleanupVersions(state, jdk),
-                        onOpenTerminal = state.sdkmanStatus.home?.takeIf(String::isNotBlank)?.let { sdkmanHome ->
-                            {
-                                terminalMessage = terminalLauncher
-                                    .launch(sdkmanHome, "java", version.identifier)
-                                    .message
-                            }
-                        },
+                        onOpenTerminal =
+                            state.sdkmanStatus.home?.takeIf(String::isNotBlank)?.let { sdkmanHome ->
+                                {
+                                    terminalMessage =
+                                        terminalLauncher
+                                            .launch(sdkmanHome, "java", version.identifier)
+                                            .message
+                                }
+                            },
                     )
                 }
             }
@@ -120,12 +125,13 @@ internal fun InstalledSdksScreen(
 ) {
     val sdks = state.candidates.filter { it.kind == CandidateKind.Sdk }
     var query by remember { mutableStateOf("") }
-    val filtered = sdks.filter { candidate ->
-        query.isBlank() ||
-            candidate.displayName.contains(query, ignoreCase = true) ||
-            candidate.name.contains(query, ignoreCase = true) ||
-            candidate.defaultVersion.orEmpty().contains(query, ignoreCase = true)
-    }
+    val filtered =
+        sdks.filter { candidate ->
+            query.isBlank() ||
+                candidate.displayName.contains(query, ignoreCase = true) ||
+                candidate.name.contains(query, ignoreCase = true) ||
+                candidate.defaultVersion.orEmpty().contains(query, ignoreCase = true)
+        }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
         PageTitle("Installed SDKs", "${sdks.size} package(s) currently present in your SDKMAN candidates directory.")
         FlowRow(

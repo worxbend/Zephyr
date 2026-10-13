@@ -9,5 +9,4 @@ fun PlannedSdkmanCommand.copyableCommand(): String =
         SdkmanCommandAction.SelfUpdate -> "sdk selfupdate"
     }
 
-private fun String?.requireField(): String =
-    requireNotNull(this) { "The planned SDKMAN command is missing a validated field." }
+private fun String?.requireField(): String = requireNotNull(this) { "The planned SDKMAN command is missing a validated field." }

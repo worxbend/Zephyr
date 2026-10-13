@@ -8,24 +8,27 @@ import com.worxbend.zephyr.domain.PlannedSdkmanCommand
 import com.worxbend.zephyr.domain.SdkmanCommandAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class ToolchainActivationTest {
     @Test
     fun installsEveryMissingTargetBeforeChangingDefaultsAndNeverRemovesVersions() {
-        val current = listOf(
-            candidate("java", default = "17-tem", installed = listOf("17-tem")),
-            candidate("gradle", default = "8.0", installed = listOf("8.0", "9.0")),
-        )
+        val current =
+            listOf(
+                candidate("java", default = "17-tem", installed = listOf("17-tem")),
+                candidate("gradle", default = "8.0", installed = listOf("8.0", "9.0")),
+            )
 
-        val plan = planToolchainActivation(
-            targets = listOf(
-                InstallTarget("java", "21-tem"),
-                InstallTarget("gradle", "9.0"),
-            ),
-            currentCandidates = current,
-        )
+        val plan =
+            planToolchainActivation(
+                targets =
+                    listOf(
+                        InstallTarget("java", "21-tem"),
+                        InstallTarget("gradle", "9.0"),
+                    ),
+                currentCandidates = current,
+            )
 
         assertEquals(
             listOf(
@@ -40,10 +43,11 @@ class ToolchainActivationTest {
 
     @Test
     fun activationIsIdempotentWhenAllTargetsAreAlreadyDefaults() {
-        val current = listOf(
-            candidate("java", default = "21-tem", installed = listOf("17-tem", "21-tem")),
-            candidate("gradle", default = "9.0", installed = listOf("9.0")),
-        )
+        val current =
+            listOf(
+                candidate("java", default = "21-tem", installed = listOf("17-tem", "21-tem")),
+                candidate("gradle", default = "9.0", installed = listOf("9.0")),
+            )
 
         assertEquals(
             emptyList(),
@@ -75,9 +79,10 @@ class ToolchainActivationTest {
         name = name,
         displayName = name,
         kind = if (name == "java") CandidateKind.Jdk else CandidateKind.Sdk,
-        installedVersions = installed.map { version ->
-            CandidateVersion(version, true, version == default, true)
-        },
+        installedVersions =
+            installed.map { version ->
+                CandidateVersion(version, true, version == default, true)
+            },
         defaultVersion = default,
         hasLocalOnlyVersions = false,
         localOnlyVersionCount = 0,

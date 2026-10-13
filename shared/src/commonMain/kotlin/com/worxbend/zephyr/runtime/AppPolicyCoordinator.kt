@@ -51,8 +51,11 @@ class AppPolicyCoordinator(
         }
         scope.launch {
             val tracker = OperationCompletionTracker()
-            states.map { (it as? ZephyrUiState.Ready)?.operationJournal }.filterNotNull()
-                .distinctUntilChanged().collect { journal ->
+            states
+                .map { (it as? ZephyrUiState.Ready)?.operationJournal }
+                .filterNotNull()
+                .distinctUntilChanged()
+                .collect { journal ->
                     for (entry in tracker.observe(journal)) {
                         operationNotification(settings.state.value.operationNotificationPolicy, entry)?.let {
                             show(it.title, it.message)
@@ -62,23 +65,27 @@ class AppPolicyCoordinator(
         }
         scope.launch {
             combine(
-                states.map { (it as? ZephyrUiState.Ready)?.localOnlyScanProgress?.trustedFindings.orEmpty() }
+                states
+                    .map { (it as? ZephyrUiState.Ready)?.localOnlyScanProgress?.trustedFindings.orEmpty() }
                     .distinctUntilChanged(),
                 settings.state.map { it.cleanupGracePeriod }.distinctUntilChanged(),
             ) { findings, _ -> findings }.collect { findings ->
                 val verified = findings.mapTo(linkedSetOf(), Candidate::name)
-                val targets = findings.flatMap { candidate ->
-                    candidate.localOnlyVersions.map { ProtectedVersion(candidate.name, it) }
-                }.toSet()
+                val targets =
+                    findings
+                        .flatMap { candidate ->
+                            candidate.localOnlyVersions.map { ProtectedVersion(candidate.name, it) }
+                        }.toSet()
                 settings.update { it.reconcileLocalOnlyObservations(targets, clock(), verified) }
             }
         }
         scope.launch {
             var lastKey: String? = null
             combine(
-                states.map { state ->
-                    (state as? ZephyrUiState.Ready)?.let { UpdateEvidence(it.candidates, it.catalog, it.isCatalogLoading) }
-                }.distinctUntilChanged(),
+                states
+                    .map { state ->
+                        (state as? ZephyrUiState.Ready)?.let { UpdateEvidence(it.candidates, it.catalog, it.isCatalogLoading) }
+                    }.distinctUntilChanged(),
                 settings.state.map { it.updateNotificationPolicy }.distinctUntilChanged(),
             ) { evidence, policy -> evidence to policy }.collect { (evidence, policy) ->
                 if (policy == UpdateNotificationPolicy.Off) {
@@ -99,7 +106,10 @@ class AppPolicyCoordinator(
         }
     }
 
-    private fun show(title: String, message: String) {
+    private fun show(
+        title: String,
+        message: String,
+    ) {
         try {
             notifications.show(title, message)
         } catch (exception: CancellationException) {
@@ -109,7 +119,9 @@ class AppPolicyCoordinator(
         }
     }
 
-    fun close() { scope.cancel() }
+    fun close() {
+        scope.cancel()
+    }
 
     suspend fun closeAndJoin(timeoutMillis: Long = 5_000L): Boolean {
         close()

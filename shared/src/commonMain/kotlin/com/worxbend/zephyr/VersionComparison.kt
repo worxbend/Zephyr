@@ -24,11 +24,12 @@ internal fun Candidate.comparisonRows(
         .map { version ->
             VersionComparisonRow(
                 version = version.version,
-                vendor = if (name == "java") {
-                    javaProviderName(javaProviderCode(version.version)) ?: "Unknown"
-                } else {
-                    "—"
-                },
+                vendor =
+                    if (name == "java") {
+                        javaProviderName(javaProviderCode(version.version)) ?: "Unknown"
+                    } else {
+                        "—"
+                    },
                 installed = version.isInstalled,
                 default = version.isDefault || defaultVersion == version.version,
                 available = version.isRemoteAvailable,

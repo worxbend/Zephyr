@@ -38,11 +38,12 @@ internal fun ProjectToolchainExportScreen(
     val presenter = remember(services) { ProjectToolchainPresenter(services.projectToolchainService, scope) }
     DisposableEffect(presenter) { onDispose(presenter::close) }
     val workflow by presenter.state.collectAsState()
-    val defaults = state.candidates.mapNotNull { candidate ->
-        candidate.defaultVersion?.let { version ->
-            Triple(candidate.name, candidate.displayName, InstallTarget(candidate.name, version))
+    val defaults =
+        state.candidates.mapNotNull { candidate ->
+            candidate.defaultVersion?.let { version ->
+                Triple(candidate.name, candidate.displayName, InstallTarget(candidate.name, version))
+            }
         }
-    }
     val defaultIds = defaults.map { it.first }
     var selected by remember(defaultIds) { mutableStateOf(defaultIds.toSet()) }
     val exporting = workflow.busy

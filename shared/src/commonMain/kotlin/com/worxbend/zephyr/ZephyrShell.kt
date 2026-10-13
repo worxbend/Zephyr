@@ -6,8 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -36,17 +36,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -55,37 +50,42 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
-import com.worxbend.zephyr.domain.CandidateKind
-import com.worxbend.zephyr.domain.ActivityAction
-import com.worxbend.zephyr.domain.ActivitySeverity
-import com.worxbend.zephyr.domain.BatchItemStatus
-import com.worxbend.zephyr.domain.ConnectivityState
-import com.worxbend.zephyr.domain.DiskImpactEstimate
-import com.worxbend.zephyr.domain.DiskImpactKind
-import com.worxbend.zephyr.domain.PlannedSdkmanCommand
-import com.worxbend.zephyr.domain.SdkmanTransaction
-import com.worxbend.zephyr.domain.formatByteSize
-import com.worxbend.zephyr.domain.copyableCommand
-import com.worxbend.zephyr.domain.requiresNetwork
+import androidx.compose.ui.unit.dp
 import com.worxbend.zephyr.actions.ZephyrActionHandler
 import com.worxbend.zephyr.actions.ZephyrActionIds
 import com.worxbend.zephyr.actions.validationError
 import com.worxbend.zephyr.data.currentEpochMillis
 import com.worxbend.zephyr.data.formatLocalTimestamp
+import com.worxbend.zephyr.domain.ActivityAction
+import com.worxbend.zephyr.domain.ActivitySeverity
+import com.worxbend.zephyr.domain.BatchItemStatus
+import com.worxbend.zephyr.domain.CandidateKind
+import com.worxbend.zephyr.domain.ConnectivityState
+import com.worxbend.zephyr.domain.DiskImpactEstimate
+import com.worxbend.zephyr.domain.DiskImpactKind
+import com.worxbend.zephyr.domain.PlannedSdkmanCommand
+import com.worxbend.zephyr.domain.SdkmanTransaction
+import com.worxbend.zephyr.domain.copyableCommand
+import com.worxbend.zephyr.domain.formatByteSize
+import com.worxbend.zephyr.domain.requiresNetwork
 import com.worxbend.zephyr.settings.AppSettings
-import com.worxbend.zephyr.settings.MetadataRefreshSchedule
-import com.worxbend.zephyr.settings.recordRecentCandidate
 import com.worxbend.zephyr.settings.MAX_NAVIGATION_WIDTH_DP
 import com.worxbend.zephyr.settings.MIN_NAVIGATION_WIDTH_DP
-import kotlin.math.roundToInt
+import com.worxbend.zephyr.settings.MetadataRefreshSchedule
+import com.worxbend.zephyr.settings.recordRecentCandidate
 import com.worxbend.zephyr.viewmodel.ZephyrRoute
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import com.worxbend.zephyr.viewmodel.ZephyrViewModel
+import kotlin.math.roundToInt
 
 private fun zephyrActionHandler(viewModel: ZephyrViewModel): ZephyrActionHandler =
     ZephyrActionHandler { request ->
@@ -93,14 +93,29 @@ private fun zephyrActionHandler(viewModel: ZephyrViewModel): ZephyrActionHandler
             false
         } else {
             when (request.id) {
-                ZephyrActionIds.RefreshInstalled -> viewModel.refreshInstalled()
-                ZephyrActionIds.ScanLocalOnly -> viewModel.scanLocalOnly()
-                ZephyrActionIds.RefreshConnectivity -> viewModel.refreshConnectivity()
-                ZephyrActionIds.RunDiagnostics -> viewModel.refreshConnectivity()
-                ZephyrActionIds.RefreshMetadata ->
+                ZephyrActionIds.REFRESH_INSTALLED -> {
+                    viewModel.refreshInstalled()
+                }
+
+                ZephyrActionIds.SCAN_LOCAL_ONLY -> {
+                    viewModel.scanLocalOnly()
+                }
+
+                ZephyrActionIds.REFRESH_CONNECTIVITY -> {
+                    viewModel.refreshConnectivity()
+                }
+
+                ZephyrActionIds.RUN_DIAGNOSTICS -> {
+                    viewModel.refreshConnectivity()
+                }
+
+                ZephyrActionIds.REFRESH_METADATA -> {
                     viewModel.requestTransaction(SdkmanTransaction.RefreshMetadata)
-                ZephyrActionIds.CheckSdkmanUpdates ->
+                }
+
+                ZephyrActionIds.CHECK_SDKMAN_UPDATES -> {
                     viewModel.requestTransaction(SdkmanTransaction.SelfUpdate)
+                }
             }
             true
         }
@@ -138,11 +153,12 @@ internal fun ZephyrScreen(
     }
 
     LaunchedEffect(state.route) {
-        val candidate = when (val route = state.route) {
-            is ZephyrRoute.JdkDetail -> route.candidate
-            is ZephyrRoute.SdkDetail -> route.candidate
-            else -> null
-        }
+        val candidate =
+            when (val route = state.route) {
+                is ZephyrRoute.JdkDetail -> route.candidate
+                is ZephyrRoute.SdkDetail -> route.candidate
+                else -> null
+            }
         if (candidate != null) {
             onSettingsChange { it.recordRecentCandidate(candidate) }
         }
@@ -184,41 +200,55 @@ internal fun ZephyrScreen(
                 } else if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
                     false
                 } else {
-                    val workspaceRoute = event.key.toWorkspaceShortcutKey()?.let { key ->
-                        resolveWorkspaceShortcut(
-                            key = key,
-                            primaryPressed = true,
-                            shiftPressed = event.isShiftPressed,
-                        )
-                    }
+                    val workspaceRoute =
+                        event.key.toWorkspaceShortcutKey()?.let { key ->
+                            resolveWorkspaceShortcut(
+                                key = key,
+                                primaryPressed = true,
+                                shiftPressed = event.isShiftPressed,
+                            )
+                        }
                     when {
                         event.key == Key.K && !event.isShiftPressed -> {
                             commandPaletteOpen = false
                             globalSearchOpen = true
                             true
                         }
+
                         event.key == Key.P && event.isShiftPressed -> {
                             globalSearchOpen = false
                             commandPaletteOpen = true
                             true
                         }
+
                         workspaceRoute != null -> {
                             activateSearchTarget(GlobalSearchTarget.Navigate(workspaceRoute))
                             true
                         }
+
                         event.key == Key.R && event.isShiftPressed -> {
                             activateSearchTarget(
-                                GlobalSearchTarget.Execute(com.worxbend.zephyr.actions.ZephyrActionRequest(ZephyrActionIds.RefreshInstalled)),
+                                GlobalSearchTarget.Execute(
+                                    com.worxbend.zephyr.actions
+                                        .ZephyrActionRequest(ZephyrActionIds.REFRESH_INSTALLED),
+                                ),
                             )
                             true
                         }
+
                         event.key == Key.L && event.isShiftPressed -> {
                             activateSearchTarget(
-                                GlobalSearchTarget.Execute(com.worxbend.zephyr.actions.ZephyrActionRequest(ZephyrActionIds.ScanLocalOnly)),
+                                GlobalSearchTarget.Execute(
+                                    com.worxbend.zephyr.actions
+                                        .ZephyrActionRequest(ZephyrActionIds.SCAN_LOCAL_ONLY),
+                                ),
                             )
                             true
                         }
-                        else -> false
+
+                        else -> {
+                            false
+                        }
                     }
                 }
             },
@@ -254,8 +284,9 @@ internal fun ZephyrScreen(
                         )
                         NavigationResizeHandle(
                             onDrag = { pixels ->
-                                navigationWidth = (navigationWidth + pixels / displayDensity)
-                                    .coerceIn(MIN_NAVIGATION_WIDTH_DP.toFloat(), MAX_NAVIGATION_WIDTH_DP.toFloat())
+                                navigationWidth =
+                                    (navigationWidth + pixels / displayDensity)
+                                        .coerceIn(MIN_NAVIGATION_WIDTH_DP.toFloat(), MAX_NAVIGATION_WIDTH_DP.toFloat())
                             },
                             onDragFinished = {
                                 onSettingsChange { it.copy(navigationWidthDp = navigationWidth.roundToInt()) }
@@ -279,13 +310,19 @@ internal fun ZephyrScreen(
                 }
                 if (shellLayout == ShellLayout.Narrow && navigationOverlayOpen) {
                     Box(
-                        Modifier.fillMaxSize()
+                        Modifier
+                            .fillMaxSize()
                             .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.24f))
                             .semantics { contentDescription = "Close navigation" }
                             .clickable { navigationOverlayOpen = false },
                     )
                     Surface(
-                        modifier = Modifier.fillMaxHeight().widthIn(max = 320.dp).fillMaxWidth().padding(end = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .widthIn(max = 320.dp)
+                                .fillMaxWidth()
+                                .padding(end = 8.dp),
                         shape = MaterialTheme.shapes.large,
                         color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 12.dp,
@@ -344,10 +381,11 @@ internal fun TransactionPreviewDialog(
         title = { Text(transaction.title, style = MaterialTheme.typography.titleLarge) },
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 440.dp)
-                    .verticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 440.dp)
+                        .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(LocalZephyrMetrics.current.panelPadding),
             ) {
                 Text(transaction.description)
@@ -364,8 +402,9 @@ internal fun TransactionPreviewDialog(
                     )
                     ZephyrPanel(Modifier.fillMaxWidth()) {
                         Column(
-                            modifier = Modifier
-                                .padding(LocalZephyrMetrics.current.panelPadding),
+                            modifier =
+                                Modifier
+                                    .padding(LocalZephyrMetrics.current.panelPadding),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             transaction.commands.forEachIndexed { index, command ->
@@ -394,16 +433,18 @@ internal fun TransactionPreviewDialog(
 
 @Composable
 private fun DiskImpactSummary(estimate: DiskImpactEstimate) {
-    val label = when (estimate.kind) {
-        DiskImpactKind.Required -> "Required disk space"
-        DiskImpactKind.Reclaimable -> "Reclaimable disk space"
-        DiskImpactKind.None -> "Disk impact"
-        DiskImpactKind.Unknown -> "Disk impact unavailable"
-    }
-    val value = when (estimate.kind) {
-        DiskImpactKind.None -> "No material change"
-        else -> estimate.bytes?.let(::formatByteSize) ?: "Not measurable"
-    }
+    val label =
+        when (estimate.kind) {
+            DiskImpactKind.Required -> "Required disk space"
+            DiskImpactKind.Reclaimable -> "Reclaimable disk space"
+            DiskImpactKind.None -> "Disk impact"
+            DiskImpactKind.Unknown -> "Disk impact unavailable"
+        }
+    val value =
+        when (estimate.kind) {
+            DiskImpactKind.None -> "No material change"
+            else -> estimate.bytes?.let(::formatByteSize) ?: "Not measurable"
+        }
     ZephyrPanel(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(LocalZephyrMetrics.current.panelPadding),
@@ -411,7 +452,12 @@ private fun DiskImpactSummary(estimate: DiskImpactEstimate) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, fontWeight = FontWeight.SemiBold)
-                Text(value, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    value,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
@@ -499,9 +545,11 @@ private fun WorkbenchToolbar(
             shadowElevation = 0.dp,
         ) {
             CenteredHeader(
-                modifier = Modifier.fillMaxWidth()
-                    .heightIn(min = metrics.toolbarHeight)
-                    .padding(horizontal = if (compactHeader) 6.dp else metrics.panelPadding, vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = metrics.toolbarHeight)
+                        .padding(horizontal = if (compactHeader) 6.dp else metrics.panelPadding, vertical = 4.dp),
                 start = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (layout == ShellLayout.Narrow) {
@@ -591,16 +639,25 @@ private fun CenteredHeader(
         val titleWidth = (constraints.maxWidth - wingWidth * 2).coerceAtLeast(0)
         val stackedTitle = titleWidth < 120.dp.roundToPx()
         val stackedActions = startPlaceable.width + endPlaceable.width > constraints.maxWidth
-        val titlePlaceable = measurables[2].measure(
-            looseConstraints.copy(maxWidth = if (stackedTitle) constraints.maxWidth else titleWidth),
-        )
-        val actionHeight = if (stackedActions) startPlaceable.height + endPlaceable.height
-            else maxOf(startPlaceable.height, endPlaceable.height)
+        val titlePlaceable =
+            measurables[2].measure(
+                looseConstraints.copy(maxWidth = if (stackedTitle) constraints.maxWidth else titleWidth),
+            )
+        val actionHeight =
+            if (stackedActions) {
+                startPlaceable.height + endPlaceable.height
+            } else {
+                maxOf(startPlaceable.height, endPlaceable.height)
+            }
         val titleGap = if (stackedTitle) 4.dp.roundToPx() else 0
-        val height = constraints.constrainHeight(
-            if (stackedTitle) titlePlaceable.height + titleGap + actionHeight
-            else maxOf(actionHeight, titlePlaceable.height),
-        )
+        val height =
+            constraints.constrainHeight(
+                if (stackedTitle) {
+                    titlePlaceable.height + titleGap + actionHeight
+                } else {
+                    maxOf(actionHeight, titlePlaceable.height)
+                },
+            )
         layout(constraints.maxWidth, height) {
             if (stackedTitle) {
                 // Keep the title and all actions usable at narrow widths and large text sizes.
@@ -693,9 +750,10 @@ private fun ActivityCenterPanel(
 ) {
     val metrics = LocalZephyrMetrics.current
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = metrics.toolbarHeight + 8.dp, start = 12.dp, end = 12.dp, bottom = metrics.statusBarHeight + 8.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(top = metrics.toolbarHeight + 8.dp, start = 12.dp, end = 12.dp, bottom = metrics.statusBarHeight + 8.dp),
         color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
@@ -738,16 +796,21 @@ private fun ActivityCenterPanel(
                         ) {
                             items(state.activityEvents, key = { it.id }) { event ->
                                 val semanticColors = LocalZephyrColors.current
-                                val accent = when (event.severity) {
-                                    ActivitySeverity.Success -> semanticColors.success
-                                    ActivitySeverity.Warning -> semanticColors.warning
-                                    ActivitySeverity.Error -> MaterialTheme.colorScheme.error
-                                    ActivitySeverity.Info -> semanticColors.info
-                                }
+                                val accent =
+                                    when (event.severity) {
+                                        ActivitySeverity.Success -> semanticColors.success
+                                        ActivitySeverity.Warning -> semanticColors.warning
+                                        ActivitySeverity.Error -> MaterialTheme.colorScheme.error
+                                        ActivitySeverity.Info -> semanticColors.info
+                                    }
                                 Surface(
                                     color = MaterialTheme.colorScheme.surface,
                                     shape = MaterialTheme.shapes.small,
-                                    border = BorderStroke(1.dp, if (event.acknowledged) MaterialTheme.colorScheme.outlineVariant else accent.copy(alpha = 0.6f)),
+                                    border =
+                                        BorderStroke(
+                                            1.dp,
+                                            if (event.acknowledged) MaterialTheme.colorScheme.outlineVariant else accent.copy(alpha = 0.6f),
+                                        ),
                                 ) {
                                     Column(
                                         modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -808,12 +871,13 @@ private fun WorkbenchSidebar(
         if (activeTask != null) expandedTasks = expandedTasks + activeTask
     }
     Column(
-        modifier = Modifier
-            .width(width)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = metrics.spacing, vertical = metrics.panelPadding),
+        modifier =
+            Modifier
+                .width(width)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = metrics.spacing, vertical = metrics.panelPadding),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Column(
@@ -850,7 +914,8 @@ private fun WorkbenchSidebar(
                 state.route is ZephyrRoute.InstalledJdk,
                 { onNavigate(ZephyrRoute.InstalledJdk) },
                 Modifier.padding(start = 14.dp),
-                state.candidates.firstOrNull { it.kind == CandidateKind.Jdk }
+                state.candidates
+                    .firstOrNull { it.kind == CandidateKind.Jdk }
                     ?.installedVersions
                     ?.count { it.isInstalled }
                     ?.toString(),
@@ -912,7 +977,10 @@ private fun WorkbenchSidebar(
             glyph = "A",
             expanded = NavigationTask.Activity in expandedTasks,
             active = activeTask == NavigationTask.Activity,
-            badge = state.operationJournal.size.takeIf { it > 0 }?.toString(),
+            badge =
+                state.operationJournal.size
+                    .takeIf { it > 0 }
+                    ?.toString(),
             onToggle = { expandedTasks = expandedTasks.toggled(NavigationTask.Activity) },
         ) {
             NavigationChild("D", "Diagnostics", state.route is ZephyrRoute.Diagnostics, ZephyrRoute.Diagnostics, onNavigate)
@@ -966,8 +1034,7 @@ private fun NavigationChild(
     )
 }
 
-private fun Set<NavigationTask>.toggled(task: NavigationTask): Set<NavigationTask> =
-    if (task in this) this - task else this + task
+private fun Set<NavigationTask>.toggled(task: NavigationTask): Set<NavigationTask> = if (task in this) this - task else this + task
 
 @Composable
 private fun NavigationResizeHandle(
@@ -975,18 +1042,19 @@ private fun NavigationResizeHandle(
     onDragFinished: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .width(7.dp)
-            .fillMaxHeight()
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = onDragFinished,
-                    onDragCancel = onDragFinished,
-                ) { change, dragAmount ->
-                    change.consume()
-                    onDrag(dragAmount)
-                }
-            },
+        modifier =
+            Modifier
+                .width(7.dp)
+                .fillMaxHeight()
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = onDragFinished,
+                        onDragCancel = onDragFinished,
+                    ) { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount)
+                    }
+                },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -1013,8 +1081,11 @@ private fun WorkbenchStatusBar(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                .padding(horizontal = metrics.panelPadding, vertical = 4.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = metrics.panelPadding, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1025,26 +1096,30 @@ private fun WorkbenchStatusBar(
                 maxLines = 1,
             )
             state.localOnlyScanProgress?.let { progress ->
-                val summary = "${progress.completed}/${progress.total} audited, " +
-                    "${progress.trustedFindings.sumOf { it.localOnlyVersionCount }} findings, " +
-                    "${progress.failures.size} failures"
+                val summary =
+                    "${progress.completed}/${progress.total} audited, " +
+                        "${progress.trustedFindings.sumOf { it.localOnlyVersionCount }} findings, " +
+                        "${progress.failures.size} failures"
                 Spacer(Modifier.width(4.dp))
                 Text(
                     summary,
-                    modifier = Modifier.semantics {
-                        contentDescription = buildString {
-                            append("Local-only audit $summary.")
-                            if (progress.activeCandidates.isNotEmpty()) {
-                                append(" Active candidates: ${progress.activeCandidates.joinToString()}.")
-                            }
-                        }
-                    },
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription =
+                                buildString {
+                                    append("Local-only audit $summary.")
+                                    if (progress.activeCandidates.isNotEmpty()) {
+                                        append(" Active candidates: ${progress.activeCandidates.joinToString()}.")
+                                    }
+                                }
+                        },
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (progress.failures.isEmpty()) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                    color =
+                        if (progress.failures.isEmpty()) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
                     maxLines = 1,
                 )
                 if (progress.failures.isNotEmpty() && !progress.running) {
@@ -1129,31 +1204,60 @@ private fun WorkbenchStatusBar(
     }
 }
 
-
 private fun ZephyrUiState.Ready.busyLabel(): String? =
     when {
         batchUninstallProgress.any { it.status == BatchItemStatus.Running } -> {
-            val completed = batchUninstallProgress.count {
-                it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
-            }
+            val completed =
+                batchUninstallProgress.count {
+                    it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+                }
             "Uninstalling ${completed + 1} of ${batchUninstallProgress.size}"
         }
+
         batchInstallProgress.any { it.status == BatchItemStatus.Running } -> {
-            val completed = batchInstallProgress.count {
-                it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
-            }
+            val completed =
+                batchInstallProgress.count {
+                    it.status == BatchItemStatus.Succeeded || it.status == BatchItemStatus.Failed
+                }
             "Installing ${completed + 1} of ${batchInstallProgress.size}"
         }
-        localOnlyScanInProgress -> localOnlyScanProgress?.let {
-            "Scanning local-only ${it.completed}/${it.total}" +
-                if (it.activeCandidates.isEmpty()) "" else " (${it.activeCandidates.joinToString()})"
-        } ?: "Scanning local-only versions"
-        storageScanInProgress -> "Measuring installed payloads"
-        isCatalogLoading -> "Loading SDKMAN catalog"
-        detailLoadingCandidate != null -> "Loading package details"
-        journalExportInProgress -> "Exporting operation journal"
-        diagnosticsExportInProgress -> "Exporting support bundle"
-        transactionPreviewLoading -> "Calculating disk impact"
-        isRefreshing -> "Refreshing SDKMAN state"
-        else -> null
+
+        localOnlyScanInProgress -> {
+            localOnlyScanProgress?.let {
+                "Scanning local-only ${it.completed}/${it.total}" +
+                    if (it.activeCandidates.isEmpty()) "" else " (${it.activeCandidates.joinToString()})"
+            } ?: "Scanning local-only versions"
+        }
+
+        storageScanInProgress -> {
+            "Measuring installed payloads"
+        }
+
+        isCatalogLoading -> {
+            "Loading SDKMAN catalog"
+        }
+
+        detailLoadingCandidate != null -> {
+            "Loading package details"
+        }
+
+        journalExportInProgress -> {
+            "Exporting operation journal"
+        }
+
+        diagnosticsExportInProgress -> {
+            "Exporting support bundle"
+        }
+
+        transactionPreviewLoading -> {
+            "Calculating disk impact"
+        }
+
+        isRefreshing -> {
+            "Refreshing SDKMAN state"
+        }
+
+        else -> {
+            null
+        }
     }

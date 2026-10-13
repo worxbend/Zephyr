@@ -5,7 +5,9 @@ import java.util.prefs.Preferences
 /** Storage owns commit ordering; the codec owns representation and validation. */
 internal interface SettingsSnapshotPersistence {
     fun readSnapshot(): String?
+
     fun readLegacyValues(): Map<String, String>
+
     fun commit(snapshot: String)
 }
 
@@ -14,14 +16,17 @@ internal interface SettingsSnapshotPersistence {
  * before moving the pointer. Any crash exposes one complete document, never mixed per-key values.
  * Preferences does not offer cross-process transactions: one application writer is supported.
  */
-internal class PreferencesSettingsPersistence(private val preferences: Preferences) : SettingsSnapshotPersistence {
+internal class PreferencesSettingsPersistence(
+    private val preferences: Preferences,
+) : SettingsSnapshotPersistence {
     override fun readSnapshot(): String? {
         val active = preferences.get(ACTIVE_KEY, null) ?: return null
         require(active == "a" || active == "b") { "Unsupported settings generation." }
         val prefix = "$SNAPSHOT_PREFIX$active"
-        val count = requireNotNull(preferences.get("$prefix-count", null)?.toIntOrNull()) {
-            "Missing or invalid committed settings chunk count."
-        }
+        val count =
+            requireNotNull(preferences.get("$prefix-count", null)?.toIntOrNull()) {
+                "Missing or invalid committed settings chunk count."
+            }
         require(count in 1..MAX_CHUNKS) { "Invalid committed settings chunk count." }
         return buildString {
             repeat(count) { index ->
@@ -30,9 +35,11 @@ internal class PreferencesSettingsPersistence(private val preferences: Preferenc
         }.also { require(it.length <= AppSettingsCodec.MAX_DOCUMENT_LENGTH) }
     }
 
-    override fun readLegacyValues(): Map<String, String> = preferences.keys()
-        .filterNot { it == ACTIVE_KEY || it.startsWith(SNAPSHOT_PREFIX) }
-        .associateWith { requireNotNull(preferences.get(it, null)) }
+    override fun readLegacyValues(): Map<String, String> =
+        preferences
+            .keys()
+            .filterNot { it == ACTIVE_KEY || it.startsWith(SNAPSHOT_PREFIX) }
+            .associateWith { requireNotNull(preferences.get(it, null)) }
 
     override fun commit(snapshot: String) {
         // Validate every Preferences constraint before the first write.

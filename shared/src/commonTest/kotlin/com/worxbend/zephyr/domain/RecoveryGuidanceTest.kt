@@ -8,14 +8,15 @@ import kotlin.test.assertTrue
 class RecoveryGuidanceTest {
     @Test
     fun everyTransactionProvidesActionableRecoverySteps() {
-        val transactions = listOf(
-            SdkmanTransaction.Install("java", "21.0.5-tem"),
-            SdkmanTransaction.Uninstall("java", "17.0.1-tem"),
-            SdkmanTransaction.SetDefault("java", "21.0.5-tem"),
-            SdkmanTransaction.CleanLocalOnly("java", listOf("17.0.1-tem")),
-            SdkmanTransaction.RefreshMetadata,
-            SdkmanTransaction.SelfUpdate,
-        )
+        val transactions =
+            listOf(
+                SdkmanTransaction.Install("java", "21.0.5-tem"),
+                SdkmanTransaction.Uninstall("java", "17.0.1-tem"),
+                SdkmanTransaction.SetDefault("java", "21.0.5-tem"),
+                SdkmanTransaction.CleanLocalOnly("java", listOf("17.0.1-tem")),
+                SdkmanTransaction.RefreshMetadata,
+                SdkmanTransaction.SelfUpdate,
+            )
 
         transactions.forEach { transaction ->
             val guidance = transaction.recoveryGuidance()
@@ -28,10 +29,13 @@ class RecoveryGuidanceTest {
 
     @Test
     fun cleanupRecoveryRequiresARescanBeforeRetry() {
-        val actions = SdkmanTransaction.CleanLocalOnly(
-            "java",
-            listOf("17.0.1-tem"),
-        ).recoveryGuidance().actions
+        val actions =
+            SdkmanTransaction
+                .CleanLocalOnly(
+                    "java",
+                    listOf("17.0.1-tem"),
+                ).recoveryGuidance()
+                .actions
 
         assertEquals(RecoveryAction.ScanLocalOnly, actions.first())
         assertContains(actions, RecoveryAction.Retry)

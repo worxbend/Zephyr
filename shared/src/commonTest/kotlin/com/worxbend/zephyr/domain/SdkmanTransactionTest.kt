@@ -8,10 +8,11 @@ import kotlin.test.assertTrue
 class SdkmanTransactionTest {
     @Test
     fun cleanupExpandsIntoAnExactTypedCommandPerVersion() {
-        val transaction = SdkmanTransaction.CleanLocalOnly(
-            candidate = "java",
-            versions = listOf("17.0.1-tem", "19.0.2-tem"),
-        )
+        val transaction =
+            SdkmanTransaction.CleanLocalOnly(
+                candidate = "java",
+                versions = listOf("17.0.1-tem", "19.0.2-tem"),
+            )
 
         assertTrue(transaction.destructive)
         assertEquals(
@@ -38,12 +39,13 @@ class SdkmanTransactionTest {
 
     @Test
     fun updateActivationPlansUniqueMissingInstallsBeforeAllDefaultChanges() {
-        val transaction = SdkmanTransaction.UpdateActivation(
-            listOf(
-                UpdateActivationTarget("gradle", "8.14", requiresInstall = true),
-                UpdateActivationTarget("kotlin", "2.2.0", requiresInstall = false),
-            ),
-        )
+        val transaction =
+            SdkmanTransaction.UpdateActivation(
+                listOf(
+                    UpdateActivationTarget("gradle", "8.14", requiresInstall = true),
+                    UpdateActivationTarget("kotlin", "2.2.0", requiresInstall = false),
+                ),
+            )
 
         assertEquals(
             listOf(

@@ -1,16 +1,22 @@
 package com.worxbend.zephyr.domain
 
 sealed interface StorageMeasurement {
-    data class Exact(val bytes: Long) : StorageMeasurement {
+    data class Exact(
+        val bytes: Long,
+    ) : StorageMeasurement {
         init {
             require(bytes >= 0) { "Storage bytes cannot be negative." }
         }
     }
 
-    data class Unknown(val reason: StorageUnknownReason) : StorageMeasurement
+    data class Unknown(
+        val reason: StorageUnknownReason,
+    ) : StorageMeasurement
 }
 
-enum class StorageUnknownReason(val label: String) {
+enum class StorageUnknownReason(
+    val label: String,
+) {
     Missing("Directory disappeared during scan"),
     NotDirectory("Version path is not a directory"),
     SymbolicLink("Symbolic link found in payload"),
@@ -34,12 +40,13 @@ data class VersionStorage(
         get() = (measurement as? StorageMeasurement.Exact)?.bytes
 
     val cleanupDisposition: StorageCleanupDisposition
-        get() = when {
-            isProtected -> StorageCleanupDisposition.BlockedProtected
-            isDefault -> StorageCleanupDisposition.BlockedDefault
-            remoteAvailability == RemoteAvailability.LocalOnly -> StorageCleanupDisposition.VerifiedLocalOnly
-            else -> StorageCleanupDisposition.OptionalNonDefault
-        }
+        get() =
+            when {
+                isProtected -> StorageCleanupDisposition.BlockedProtected
+                isDefault -> StorageCleanupDisposition.BlockedDefault
+                remoteAvailability == RemoteAvailability.LocalOnly -> StorageCleanupDisposition.VerifiedLocalOnly
+                else -> StorageCleanupDisposition.OptionalNonDefault
+            }
 }
 
 enum class StorageCleanupDisposition(
@@ -81,19 +88,19 @@ data class StorageInventory(
         get() = versions.storageTotal()
 
     val candidates: List<CandidateStorage>
-        get() = versions
-            .groupBy(VersionStorage::candidate)
-            .map { (candidate, versions) ->
-                CandidateStorage(
-                    candidate = candidate,
-                    displayName = versions.first().candidateDisplayName,
-                    versions = versions.sortedWith(storageSizeComparator),
+        get() =
+            versions
+                .groupBy(VersionStorage::candidate)
+                .map { (candidate, versions) ->
+                    CandidateStorage(
+                        candidate = candidate,
+                        displayName = versions.first().candidateDisplayName,
+                        versions = versions.sortedWith(storageSizeComparator),
+                    )
+                }.sortedWith(
+                    compareByDescending<CandidateStorage> { it.total.knownBytes }
+                        .thenBy { it.displayName.lowercase() },
                 )
-            }
-            .sortedWith(
-                compareByDescending<CandidateStorage> { it.total.knownBytes }
-                    .thenBy { it.displayName.lowercase() },
-            )
 
     companion object {
         val Empty = StorageInventory(emptyList(), scannedAtEpochMillis = 0L)
@@ -108,9 +115,10 @@ val storageSizeComparator: Comparator<VersionStorage> =
 
 fun List<VersionStorage>.storageTotal(): StorageTotal =
     StorageTotal(
-        knownBytes = fold(0L) { total, entry ->
-            val bytes = entry.bytes ?: return@fold total
-            if (Long.MAX_VALUE - total < bytes) Long.MAX_VALUE else total + bytes
-        },
+        knownBytes =
+            fold(0L) { total, entry ->
+                val bytes = entry.bytes ?: return@fold total
+                if (Long.MAX_VALUE - total < bytes) Long.MAX_VALUE else total + bytes
+            },
         unknownEntries = count { it.measurement is StorageMeasurement.Unknown },
     )

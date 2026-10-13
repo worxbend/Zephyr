@@ -11,24 +11,58 @@ import com.worxbend.zephyr.domain.SdkmanTransaction
 import kotlinx.coroutines.CancellationException
 
 /** Executes one durable plan step; never retries a mutation or performs presentation refreshes. */
-internal class OperationExecution(private val repository: SdkmanRepository) {
-    suspend fun execute(transaction: SdkmanTransaction, command: PlannedSdkmanCommand): CommandOutcome =
+internal class OperationExecution(
+    private val repository: SdkmanRepository,
+) {
+    suspend fun execute(
+        transaction: SdkmanTransaction,
+        command: PlannedSdkmanCommand,
+    ): CommandOutcome =
         try {
             when (command.action) {
-                SdkmanCommandAction.Install -> repository.install(requireNotNull(command.candidate), requireNotNull(command.version))
-                SdkmanCommandAction.Uninstall -> if (transaction is SdkmanTransaction.CleanLocalOnly) {
-                    // Singleton calls retain each receipt while keeping repository evidence/default/protection checks.
-                    repository.cleanLocalOnly(requireNotNull(command.candidate), listOf(requireNotNull(command.version)))
-                } else {
-                    repository.uninstall(requireNotNull(command.candidate), requireNotNull(command.version))
+                SdkmanCommandAction.Install -> {
+                    repository.install(requireNotNull(command.candidate), requireNotNull(command.version))
                 }
-                SdkmanCommandAction.SetDefault -> repository.setDefault(requireNotNull(command.candidate), requireNotNull(command.version))
-                SdkmanCommandAction.UpdateMetadata -> repository.refreshCandidateMetadata()
-                SdkmanCommandAction.SelfUpdate -> when (val result = repository.selfUpdate()) {
-                    SdkmanSelfUpdateStatus.NotChecked -> CommandOutcome(false, "SDKMAN update was not checked.", CommandOutcomeStatus.Indeterminate)
-                    SdkmanSelfUpdateStatus.UpToDate -> CommandOutcome(true, "SDKMAN is up to date.")
-                    SdkmanSelfUpdateStatus.Updated -> CommandOutcome(true, "SDKMAN was updated.")
-                    is SdkmanSelfUpdateStatus.Failed -> CommandOutcome(false, result.message)
+
+                SdkmanCommandAction.Uninstall -> {
+                    if (transaction is SdkmanTransaction.CleanLocalOnly) {
+                        // Singleton calls retain each receipt while keeping repository evidence/default/protection checks.
+                        repository.cleanLocalOnly(requireNotNull(command.candidate), listOf(requireNotNull(command.version)))
+                    } else {
+                        repository.uninstall(requireNotNull(command.candidate), requireNotNull(command.version))
+                    }
+                }
+
+                SdkmanCommandAction.SetDefault -> {
+                    repository.setDefault(requireNotNull(command.candidate), requireNotNull(command.version))
+                }
+
+                SdkmanCommandAction.UpdateMetadata -> {
+                    repository.refreshCandidateMetadata()
+                }
+
+                SdkmanCommandAction.SelfUpdate -> {
+                    when (val result = repository.selfUpdate()) {
+                        SdkmanSelfUpdateStatus.NotChecked -> {
+                            CommandOutcome(
+                                false,
+                                "SDKMAN update was not checked.",
+                                CommandOutcomeStatus.Indeterminate,
+                            )
+                        }
+
+                        SdkmanSelfUpdateStatus.UpToDate -> {
+                            CommandOutcome(true, "SDKMAN is up to date.")
+                        }
+
+                        SdkmanSelfUpdateStatus.Updated -> {
+                            CommandOutcome(true, "SDKMAN was updated.")
+                        }
+
+                        is SdkmanSelfUpdateStatus.Failed -> {
+                            CommandOutcome(false, result.message)
+                        }
+                    }
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -39,11 +73,14 @@ internal class OperationExecution(private val repository: SdkmanRepository) {
         }
 }
 
-internal fun CommandOutcome.operationStepStatus(): OperationStepStatus = when (status) {
-    CommandOutcomeStatus.Indeterminate -> OperationStepStatus.Indeterminate
-    CommandOutcomeStatus.Failed -> OperationStepStatus.Failed
-    CommandOutcomeStatus.Applied,
-    CommandOutcomeStatus.AppliedWithWarning,
-    CommandOutcomeStatus.AlreadySatisfied,
-    -> OperationStepStatus.Succeeded
-}
+internal fun CommandOutcome.operationStepStatus(): OperationStepStatus =
+    when (status) {
+        CommandOutcomeStatus.Indeterminate -> OperationStepStatus.Indeterminate
+
+        CommandOutcomeStatus.Failed -> OperationStepStatus.Failed
+
+        CommandOutcomeStatus.Applied,
+        CommandOutcomeStatus.AppliedWithWarning,
+        CommandOutcomeStatus.AlreadySatisfied,
+        -> OperationStepStatus.Succeeded
+    }

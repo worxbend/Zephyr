@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
 /** Small, original symbolic drawings; labels belong to the surrounding control. */
-internal enum class ZephyrIcon(val pathData: String) {
+internal enum class ZephyrIcon(
+    val pathData: String,
+) {
     Search("M10.5,3.5 A7,7 0 1,0 10.5,17.5 A7,7 0 1,0 10.5,3.5 M16,16 L21,21"),
     Menu("M4,6 H20 M4,12 H20 M4,18 H20"),
     More("M11,5 H13 M11,12 H13 M11,19 H13"),
@@ -49,14 +51,15 @@ internal fun ZephyrSymbol(
     }
 }
 
-internal fun navigationSymbol(glyph: String): ZephyrIcon = when (glyph.removePrefix("›").removePrefix("⌄")) {
-    "O" -> ZephyrIcon.Grid
-    "I", "J", "S", "+J", "+S" -> ZephyrIcon.Package
-    "⌕" -> ZephyrIcon.Search
-    "P", "W", "◎" -> ZephyrIcon.Folder
-    "↑", "↥", "↧" -> ZephyrIcon.Update
-    "▣", "−" -> ZephyrIcon.Storage
-    "A", "T", "D", "≡" -> ZephyrIcon.Activity
-    "⚙" -> ZephyrIcon.Settings
-    else -> ZephyrIcon.Info
-}
+internal fun navigationSymbol(glyph: String): ZephyrIcon =
+    when (glyph.removePrefix("›").removePrefix("⌄")) {
+        "O" -> ZephyrIcon.Grid
+        "I", "J", "S", "+J", "+S" -> ZephyrIcon.Package
+        "⌕" -> ZephyrIcon.Search
+        "P", "W", "◎" -> ZephyrIcon.Folder
+        "↑", "↥", "↧" -> ZephyrIcon.Update
+        "▣", "−" -> ZephyrIcon.Storage
+        "A", "T", "D", "≡" -> ZephyrIcon.Activity
+        "⚙" -> ZephyrIcon.Settings
+        else -> ZephyrIcon.Info
+    }

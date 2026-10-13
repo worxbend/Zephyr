@@ -8,7 +8,9 @@ enum class IntegrityCheckId {
     DefaultLinks,
 }
 
-enum class IntegrityStatus(val label: String) {
+enum class IntegrityStatus(
+    val label: String,
+) {
     Passed("Passed"),
     Warning("Warning"),
     Failed("Failed"),

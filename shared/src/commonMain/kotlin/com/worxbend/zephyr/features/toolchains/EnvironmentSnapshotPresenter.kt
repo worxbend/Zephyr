@@ -37,13 +37,27 @@ class EnvironmentSnapshotPresenter(
     fun updateCandidates(candidates: List<Candidate>) {
         mutableState.update { it.copy(current = captureEnvironmentSnapshot(candidates, clock())) }
     }
-    fun captureBaseline() { mutableState.update { it.copy(baseline = it.current, message = "Baseline captured for this session.", error = null) } }
-    fun message(value: String) { mutableState.update { it.copy(message = value) } }
-    fun importRestore() = work(exporting = false) {
-        service.chooseAndRead()?.let { snapshot ->
-            mutableState.update { it.copy(restoreSnapshot = snapshot, message = "Loaded snapshot with ${snapshot.candidates.size} candidate(s).") }
-        }
+
+    fun captureBaseline() {
+        mutableState.update { it.copy(baseline = it.current, message = "Baseline captured for this session.", error = null) }
     }
+
+    fun message(value: String) {
+        mutableState.update { it.copy(message = value) }
+    }
+
+    fun importRestore() =
+        work(exporting = false) {
+            service.chooseAndRead()?.let { snapshot ->
+                mutableState.update {
+                    it.copy(
+                        restoreSnapshot = snapshot,
+                        message = "Loaded snapshot with ${snapshot.candidates.size} candidate(s).",
+                    )
+                }
+            }
+        }
+
     fun export() {
         val snapshot = state.value.current
         work(exporting = true) {
@@ -52,15 +66,29 @@ class EnvironmentSnapshotPresenter(
             }
         }
     }
-    private fun work(exporting: Boolean, action: suspend () -> Unit) {
+
+    private fun work(
+        exporting: Boolean,
+        action: suspend () -> Unit,
+    ) {
         if (state.value.choosing || state.value.exporting) return
         mutableState.update { it.copy(choosing = !exporting, exporting = exporting, error = null, message = null) }
         scope.launch {
-            try { action() }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) { mutableState.update { it.copy(error = failure.message ?: "Environment snapshot operation failed.") } }
-            finally { mutableState.update { it.copy(choosing = false, exporting = false) } }
+            try {
+                action()
+            } catch (
+                cancelled: CancellationException,
+            ) {
+                throw cancelled
+            } catch (
+                failure: Exception,
+            ) {
+                mutableState.update { it.copy(error = failure.message ?: "Environment snapshot operation failed.") }
+            } finally {
+                mutableState.update { it.copy(choosing = false, exporting = false) }
+            }
         }
     }
+
     fun close() = scope.cancel()
 }

@@ -10,28 +10,31 @@ import kotlin.test.assertEquals
 class ProjectToolchainTest {
     @Test
     fun distinguishesCurrentInstalledAndMissingTargets() {
-        val candidate = Candidate(
-            name = "java",
-            displayName = "Java",
-            kind = CandidateKind.Jdk,
-            installedVersions = listOf(
-                CandidateVersion("21-tem", true, true, true),
-                CandidateVersion("17-tem", true, false, true),
-            ),
-            defaultVersion = "21-tem",
-            hasLocalOnlyVersions = false,
-            localOnlyVersionCount = 0,
-            localOnlyVersions = emptyList(),
-        )
+        val candidate =
+            Candidate(
+                name = "java",
+                displayName = "Java",
+                kind = CandidateKind.Jdk,
+                installedVersions =
+                    listOf(
+                        CandidateVersion("21-tem", true, true, true),
+                        CandidateVersion("17-tem", true, false, true),
+                    ),
+                defaultVersion = "21-tem",
+                hasLocalOnlyVersions = false,
+                localOnlyVersionCount = 0,
+                localOnlyVersions = emptyList(),
+            )
 
-        val diff = compareProjectToolchain(
-            listOf(
-                InstallTarget("java", "21-tem"),
-                InstallTarget("java", "17-tem"),
-                InstallTarget("gradle", "8.14"),
-            ),
-            listOf(candidate),
-        )
+        val diff =
+            compareProjectToolchain(
+                listOf(
+                    InstallTarget("java", "21-tem"),
+                    InstallTarget("java", "17-tem"),
+                    InstallTarget("gradle", "8.14"),
+                ),
+                listOf(candidate),
+            )
 
         assertEquals(
             listOf(ProjectTargetStatus.Current, ProjectTargetStatus.DefaultChange, ProjectTargetStatus.Install),

@@ -93,9 +93,10 @@ internal fun ProjectWorkspacesScreen(
                 val error = errors[reference.sdkmanRcPath]
                 val diff = document?.let { compareProjectToolchain(it.targets, state.candidates) }.orEmpty()
                 val status = projectWorkspaceStatus(diff)
-                val missing = diff
-                    .filter { it.status == ProjectTargetStatus.Install }
-                    .map(ProjectTargetDiff::target)
+                val missing =
+                    diff
+                        .filter { it.status == ProjectTargetStatus.Install }
+                        .map(ProjectTargetDiff::target)
                 ZephyrPanel(Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
@@ -114,14 +115,29 @@ internal fun ProjectWorkspacesScreen(
                                 )
                                 Text(
                                     when {
-                                        error != null -> "Workspace unavailable"
-                                        document == null -> "Loading local .sdkmanrc"
-                                        document.targets.isEmpty() -> "No valid targets"
-                                        status == ProjectWorkspaceStatus.DefaultsDiffer ->
+                                        error != null -> {
+                                            "Workspace unavailable"
+                                        }
+
+                                        document == null -> {
+                                            "Loading local .sdkmanrc"
+                                        }
+
+                                        document.targets.isEmpty() -> {
+                                            "No valid targets"
+                                        }
+
+                                        status == ProjectWorkspaceStatus.DefaultsDiffer -> {
                                             "All versions are installed; global defaults differ and will remain unchanged."
-                                        status == ProjectWorkspaceStatus.Ready ->
+                                        }
+
+                                        status == ProjectWorkspaceStatus.Ready -> {
                                             "Every target is installed and already matches the persisted defaults."
-                                        else -> "${missing.size} target(s) must be installed before launch."
+                                        }
+
+                                        else -> {
+                                            "${missing.size} target(s) must be installed before launch."
+                                        }
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -142,9 +158,10 @@ internal fun ProjectWorkspacesScreen(
                                 onClick = {
                                     onSettingsChange {
                                         it.copy(
-                                            projectWorkspaces = it.projectWorkspaces.filterNot { workspace ->
-                                                workspace.sdkmanRcPath == reference.sdkmanRcPath
-                                            },
+                                            projectWorkspaces =
+                                                it.projectWorkspaces.filterNot { workspace ->
+                                                    workspace.sdkmanRcPath == reference.sdkmanRcPath
+                                                },
                                         )
                                     }
                                 },
@@ -189,9 +206,10 @@ internal fun ProjectWorkspacesScreen(
                                 }
                                 ZephyrToolbarButton(
                                     "Open scoped terminal",
-                                    enabled = missing.isEmpty() &&
-                                        workspace.targets.isNotEmpty() &&
-                                        !state.sdkmanStatus.home.isNullOrBlank(),
+                                    enabled =
+                                        missing.isEmpty() &&
+                                            workspace.targets.isNotEmpty() &&
+                                            !state.sdkmanStatus.home.isNullOrBlank(),
                                     onClick = { presenter.launch(state.sdkmanStatus.home.orEmpty(), workspace) },
                                 )
                                 launchMessages[reference.sdkmanRcPath]?.let { message ->

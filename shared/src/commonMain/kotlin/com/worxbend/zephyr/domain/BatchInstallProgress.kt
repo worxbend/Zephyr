@@ -1,6 +1,8 @@
 package com.worxbend.zephyr.domain
 
-enum class BatchItemStatus(val label: String) {
+enum class BatchItemStatus(
+    val label: String,
+) {
     Pending("Pending"),
     Running("Running"),
     Succeeded("Succeeded"),

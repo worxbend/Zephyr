@@ -8,7 +8,9 @@ data class SdkmanHomeSelectionResult(
 
 interface SdkmanHomeConfigurationService {
     suspend fun configuredPath(): String?
+
     suspend fun chooseAndSave(): SdkmanHomeSelectionResult?
+
     suspend fun clear(): SdkmanHomeSelectionResult
 }
 

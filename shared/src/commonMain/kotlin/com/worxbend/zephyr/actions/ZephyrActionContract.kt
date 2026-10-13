@@ -3,12 +3,31 @@ package com.worxbend.zephyr.actions
 const val ZEPHYR_ACTION_CONTRACT_VERSION = 1
 
 object ZephyrActionIds {
-    const val RefreshInstalled = "zephyr.read.refresh-installed"
-    const val ScanLocalOnly = "zephyr.read.scan-local-only"
-    const val RefreshConnectivity = "zephyr.read.refresh-connectivity"
-    const val RunDiagnostics = "zephyr.read.run-connection-diagnostics"
-    const val RefreshMetadata = "zephyr.review.refresh-metadata"
-    const val CheckSdkmanUpdates = "zephyr.review.check-sdkman-updates"
+    const val REFRESH_INSTALLED = "zephyr.read.refresh-installed"
+    const val SCAN_LOCAL_ONLY = "zephyr.read.scan-local-only"
+    const val REFRESH_CONNECTIVITY = "zephyr.read.refresh-connectivity"
+    const val RUN_DIAGNOSTICS = "zephyr.read.run-connection-diagnostics"
+    const val REFRESH_METADATA = "zephyr.review.refresh-metadata"
+    const val CHECK_SDKMAN_UPDATES = "zephyr.review.check-sdkman-updates"
+
+    // Keep the original version-1 public constant names source-compatible.
+    @Suppress("ktlint:standard:property-naming")
+    const val RefreshInstalled = REFRESH_INSTALLED
+
+    @Suppress("ktlint:standard:property-naming")
+    const val ScanLocalOnly = SCAN_LOCAL_ONLY
+
+    @Suppress("ktlint:standard:property-naming")
+    const val RefreshConnectivity = REFRESH_CONNECTIVITY
+
+    @Suppress("ktlint:standard:property-naming")
+    const val RunDiagnostics = RUN_DIAGNOSTICS
+
+    @Suppress("ktlint:standard:property-naming")
+    const val RefreshMetadata = REFRESH_METADATA
+
+    @Suppress("ktlint:standard:property-naming")
+    const val CheckSdkmanUpdates = CHECK_SDKMAN_UPDATES
 }
 
 data class ZephyrActionRequest(
@@ -25,14 +44,25 @@ data class ZephyrActionDescriptor(
     val allowedParameters: Set<String> = emptySet(),
 )
 
-val ZEPHYR_ACTIONS: List<ZephyrActionDescriptor> = listOf(
-    ZephyrActionDescriptor(ZephyrActionIds.RefreshInstalled, "Refresh installed state", "Reload local SDKMAN candidates.", false),
-    ZephyrActionDescriptor(ZephyrActionIds.ScanLocalOnly, "Scan local-only versions", "Compare local versions with SDKMAN metadata.", false),
-    ZephyrActionDescriptor(ZephyrActionIds.RefreshConnectivity, "Check connectivity", "Refresh SDKMAN service reachability.", false),
-    ZephyrActionDescriptor(ZephyrActionIds.RunDiagnostics, "Run connection diagnostics", "Run a read-only route-aware SDKMAN connection diagnostic.", false),
-    ZephyrActionDescriptor(ZephyrActionIds.RefreshMetadata, "Refresh metadata", "Open review for an SDKMAN metadata update.", true),
-    ZephyrActionDescriptor(ZephyrActionIds.CheckSdkmanUpdates, "Check SDKMAN updates", "Open review for SDKMAN self-update.", true),
-)
+val ZEPHYR_ACTIONS: List<ZephyrActionDescriptor> =
+    listOf(
+        ZephyrActionDescriptor(ZephyrActionIds.REFRESH_INSTALLED, "Refresh installed state", "Reload local SDKMAN candidates.", false),
+        ZephyrActionDescriptor(
+            ZephyrActionIds.SCAN_LOCAL_ONLY,
+            "Scan local-only versions",
+            "Compare local versions with SDKMAN metadata.",
+            false,
+        ),
+        ZephyrActionDescriptor(ZephyrActionIds.REFRESH_CONNECTIVITY, "Check connectivity", "Refresh SDKMAN service reachability.", false),
+        ZephyrActionDescriptor(
+            ZephyrActionIds.RUN_DIAGNOSTICS,
+            "Run connection diagnostics",
+            "Run a read-only route-aware SDKMAN connection diagnostic.",
+            false,
+        ),
+        ZephyrActionDescriptor(ZephyrActionIds.REFRESH_METADATA, "Refresh metadata", "Open review for an SDKMAN metadata update.", true),
+        ZephyrActionDescriptor(ZephyrActionIds.CHECK_SDKMAN_UPDATES, "Check SDKMAN updates", "Open review for SDKMAN self-update.", true),
+    )
 
 fun ZephyrActionRequest.validationError(): String? {
     if (contractVersion != ZEPHYR_ACTION_CONTRACT_VERSION) return "Unsupported action contract version."

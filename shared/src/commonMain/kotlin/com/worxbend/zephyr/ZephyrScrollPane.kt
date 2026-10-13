@@ -36,10 +36,11 @@ internal fun ZephyrScrollPane(
         VerticalScrollbar(
             adapter = rememberScrollbarAdapter(scroll),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-            style = LocalScrollbarStyle.current.copy(
-                unhoverColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                hoverColor = MaterialTheme.colorScheme.onSurface,
-            ),
+            style =
+                LocalScrollbarStyle.current.copy(
+                    unhoverColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    hoverColor = MaterialTheme.colorScheme.onSurface,
+                ),
         )
     }
 }

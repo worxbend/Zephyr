@@ -47,9 +47,15 @@ internal fun SettingsScreen(
 ) {
     val services = LocalAppServices.current
     val scope = rememberCoroutineScope()
-    val presenter = remember(services) {
-        SettingsPresenter(services.proxyConfigurationService, services.sdkmanHomeConfigurationService, services.portablePreferencesService, scope)
-    }
+    val presenter =
+        remember(services) {
+            SettingsPresenter(
+                services.proxyConfigurationService,
+                services.sdkmanHomeConfigurationService,
+                services.portablePreferencesService,
+                scope,
+            )
+        }
     DisposableEffect(presenter) { onDispose(presenter::close) }
     val workflow by presenter.state.collectAsState()
     val proxyConfiguration = workflow.proxy
@@ -60,25 +66,49 @@ internal fun SettingsScreen(
     val portablePreferencesMessage = workflow.portablePreferencesMessage
     var proxyPassword by remember { mutableStateOf("") }
     ZephyrScrollPane(
-        modifier = Modifier
-            .fillMaxHeight()
-            .widthIn(max = 920.dp)
-            .fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .widthIn(max = 920.dp)
+                .fillMaxWidth(),
         spacing = 28.dp,
     ) {
         PageTitle("Settings", "Personalize Zephyr. Save status tracks persistence for this desktop user.")
         settingsSaveStatus?.let { status ->
-            val description = when (status) {
-                com.worxbend.zephyr.settings.SettingsSaveStatus.Loading -> "Loading saved settings…"
-                is com.worxbend.zephyr.settings.SettingsSaveStatus.Dirty -> "Settings have unsaved changes."
-                is com.worxbend.zephyr.settings.SettingsSaveStatus.Saving -> "Saving settings…"
-                is com.worxbend.zephyr.settings.SettingsSaveStatus.Saved -> "Settings saved."
-                is com.worxbend.zephyr.settings.SettingsSaveStatus.Failed -> when (status.reason) {
-                    com.worxbend.zephyr.settings.SettingsFailureReason.Load -> "Saved settings could not be loaded. Existing persisted settings have not been replaced."
-                    com.worxbend.zephyr.settings.SettingsFailureReason.Save -> "Settings have unsaved changes. Saving failed; changes are not durably confirmed."
-                    com.worxbend.zephyr.settings.SettingsFailureReason.Transform -> "The settings change could not be applied."
+            val description =
+                when (status) {
+                    com.worxbend.zephyr.settings.SettingsSaveStatus.Loading -> {
+                        "Loading saved settings…"
+                    }
+
+                    is com.worxbend.zephyr.settings.SettingsSaveStatus.Dirty -> {
+                        "Settings have unsaved changes."
+                    }
+
+                    is com.worxbend.zephyr.settings.SettingsSaveStatus.Saving -> {
+                        "Saving settings…"
+                    }
+
+                    is com.worxbend.zephyr.settings.SettingsSaveStatus.Saved -> {
+                        "Settings saved."
+                    }
+
+                    is com.worxbend.zephyr.settings.SettingsSaveStatus.Failed -> {
+                        when (status.reason) {
+                            com.worxbend.zephyr.settings.SettingsFailureReason.Load -> {
+                                "Saved settings could not be loaded. Existing persisted settings have not been replaced."
+                            }
+
+                            com.worxbend.zephyr.settings.SettingsFailureReason.Save -> {
+                                "Settings have unsaved changes. Saving failed; changes are not durably confirmed."
+                            }
+
+                            com.worxbend.zephyr.settings.SettingsFailureReason.Transform -> {
+                                "The settings change could not be applied."
+                            }
+                        }
+                    }
                 }
-            }
             Text(description, style = MaterialTheme.typography.bodySmall)
             if (status is com.worxbend.zephyr.settings.SettingsSaveStatus.Failed) {
                 ZephyrToolbarButton("Retry settings save", onClick = onRetrySettingsSave)
@@ -138,11 +168,12 @@ internal fun SettingsScreen(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             ZephyrSettingsRow(
                 title = "Navigation width",
-                description = if (settings.navigationWidthDp == 0) {
-                    "Using the density-aware default. Drag the sidebar divider to resize."
-                } else {
-                    "${settings.navigationWidthDp} dp. Drag the sidebar divider to resize."
-                },
+                description =
+                    if (settings.navigationWidthDp == 0) {
+                        "Using the density-aware default. Drag the sidebar divider to resize."
+                    } else {
+                        "${settings.navigationWidthDp} dp. Drag the sidebar divider to resize."
+                    },
             ) {
                 ZephyrToolbarButton(
                     label = "Reset width",
@@ -314,12 +345,20 @@ internal fun SettingsScreen(
                 ZephyrToolbarButton(
                     label = "Save proxy",
                     enabled = workflow.loaded && !workflow.busy,
-                    onClick = { presenter.saveProxy(proxyPassword.takeIf(String::isNotEmpty)); proxyPassword = "" },
+                    onClick = {
+                        presenter.saveProxy(proxyPassword.takeIf(String::isNotEmpty))
+                        proxyPassword = ""
+                    },
                 )
                 ZephyrToolbarButton(
                     label = "Clear password",
                     onClick = { presenter.clearPassword() },
-                    enabled = !workflow.busy && (proxyConfiguration.hasStoredPassword || proxyConfiguration.pendingCredentialCleanup || proxyConfiguration.credentialStatus == com.worxbend.zephyr.data.ProxyCredentialStatus.Failed),
+                    enabled =
+                        !workflow.busy &&
+                            (
+                                proxyConfiguration.hasStoredPassword || proxyConfiguration.pendingCredentialCleanup ||
+                                    proxyConfiguration.credentialStatus == com.worxbend.zephyr.data.ProxyCredentialStatus.Failed
+                            ),
                 )
             }
             proxyMessage?.let {

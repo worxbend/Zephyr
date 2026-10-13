@@ -9,13 +9,14 @@ import kotlin.test.assertTrue
 class SdkmanListParserTest {
     @Test
     fun ignoresCatalogAndVersionIdentifiersOutsideTheCommandBoundary() {
-        val invalidCandidateCatalog = """
+        val invalidCandidateCatalog =
+            """
             Bad Candidate (1.0)                                      https://example.invalid/
             ${'$'} sdk install BAD_CANDIDATE
             --------------------------------------------------------------------------------
             Valid Candidate (1.0)                                    https://example.invalid/
             ${'$'} sdk install valid-candidate
-        """.trimIndent()
+            """.trimIndent()
         val oversizedVersion = "1" + "a".repeat(256)
 
         assertEquals(listOf("valid-candidate"), SdkmanListParser.parseCatalog(invalidCandidateCatalog, emptySet()).map { it.name })
@@ -24,7 +25,8 @@ class SdkmanListParserTest {
 
     @Test
     fun parsesCatalogBlocksFromSdkmanListOutput() {
-        val output = """
+        val output =
+            """
             ================================================================================
             Available Candidates
             ================================================================================
@@ -41,7 +43,7 @@ class SdkmanListParserTest {
             Java Development Kits from multiple providers.
 
                                                                   ${'$'} sdk install java
-        """.trimIndent()
+            """.trimIndent()
 
         val catalog = SdkmanListParser.parseCatalog(output, installedNames = setOf("java"))
 
@@ -56,7 +58,8 @@ class SdkmanListParserTest {
 
     @Test
     fun parsesMultiColumnVersionRowsWithoutMarkingRemoteVersionsLocalOnly() {
-        val output = """
+        val output =
+            """
             ================================================================================
             Available Scala Versions
             ================================================================================
@@ -68,7 +71,7 @@ class SdkmanListParserTest {
             * - installed
             > - currently in use
             ================================================================================
-        """.trimIndent()
+            """.trimIndent()
 
         val versions = SdkmanListParser.parseVersions(output)
         val latest = versions.first { it.version == "3.8.3" }
@@ -84,7 +87,8 @@ class SdkmanListParserTest {
 
     @Test
     fun skipsJavaListHeadingsAndInstructions() {
-        val output = """
+        val output =
+            """
             Available Java Versions for Linux 64bit
             ================================================================================
              Vendor        | Use | Version      | Dist    | Status     | Identifier
@@ -100,7 +104,7 @@ class SdkmanListParserTest {
                 ${'$'} sdk install java 25.0.3-tem
             Hit Q to exit this list view
             ================================================================================
-        """.trimIndent()
+            """.trimIndent()
 
         val versions = SdkmanListParser.parseVersions(output)
 
@@ -109,7 +113,8 @@ class SdkmanListParserTest {
 
     @Test
     fun marksPartialTablesAsDegradedEvenWhenSomeRowsParse() {
-        val output = """
+        val output =
+            """
             ================================================================================
             Available Java Versions for Linux 64bit
             ================================================================================
@@ -118,7 +123,7 @@ class SdkmanListParserTest {
              Temurin       |     | 25.0.3       | tem     |            | 25.0.3-tem
              Unknown row   | data that changed upstream 2027
             ================================================================================
-        """.trimIndent()
+            """.trimIndent()
 
         val report = SdkmanListParser.parseVersionsReport(output)
 
@@ -130,7 +135,8 @@ class SdkmanListParserTest {
 
     @Test
     fun requiresCompleteNonTruncatedEvidenceForTrustedReports() {
-        val complete = """
+        val complete =
+            """
             ================================================================================
             Available Java Versions for Linux 64bit
             ================================================================================
@@ -138,7 +144,7 @@ class SdkmanListParserTest {
             --------------------------------------------------------------------------------
              Temurin       |     | 25.0.3       | tem     |            | 25.0.3-tem
             ================================================================================
-        """.trimIndent()
+            """.trimIndent()
 
         assertEquals(VersionParseConfidence.Trusted, SdkmanListParser.parseVersionsReport(complete).confidence)
         assertEquals(

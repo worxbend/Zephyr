@@ -77,13 +77,24 @@ internal fun EnvironmentSnapshotScreen(
                 enabled = !choosingSnapshot && !state.isRefreshing,
             )
             ZephyrToolbarButton(
-                label = when {
-                    restoreSnapshot == null -> "Review restore"
-                    restorePlan.isEmpty() -> "Already restored"
-                    state.snapshotRestoreProgress.any { it.status == BatchItemStatus.Failed } ->
-                        "Resume ${restorePlan.size} step(s)"
-                    else -> "Restore ${restorePlan.size} step(s)"
-                },
+                label =
+                    when {
+                        restoreSnapshot == null -> {
+                            "Review restore"
+                        }
+
+                        restorePlan.isEmpty() -> {
+                            "Already restored"
+                        }
+
+                        state.snapshotRestoreProgress.any { it.status == BatchItemStatus.Failed } -> {
+                            "Resume ${restorePlan.size} step(s)"
+                        }
+
+                        else -> {
+                            "Restore ${restorePlan.size} step(s)"
+                        }
+                    },
                 onClick = {
                     onReviewRestore(restorePlan)
                 },
@@ -132,12 +143,13 @@ internal fun EnvironmentSnapshotScreen(
                     }
                     if (state.snapshotRestoreProgress.isNotEmpty()) {
                         Text(
-                            "Last run: " + state.snapshotRestoreProgress
-                                .groupingBy { progress -> progress.status }
-                                .eachCount()
-                                .entries
-                                .sortedBy { entry -> entry.key.ordinal }
-                                .joinToString { entry -> "${entry.value} ${entry.key.label.lowercase()}" },
+                            "Last run: " +
+                                state.snapshotRestoreProgress
+                                    .groupingBy { progress -> progress.status }
+                                    .eachCount()
+                                    .entries
+                                    .sortedBy { entry -> entry.key.ordinal }
+                                    .joinToString { entry -> "${entry.value} ${entry.key.label.lowercase()}" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -249,13 +261,14 @@ internal fun EnvironmentSnapshotScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         change?.let {
-                            val summary = buildList {
-                                if (it.previousDefault != it.currentDefault) {
-                                    add("default ${it.previousDefault ?: "none"} → ${it.currentDefault ?: "none"}")
+                            val summary =
+                                buildList {
+                                    if (it.previousDefault != it.currentDefault) {
+                                        add("default ${it.previousDefault ?: "none"} → ${it.currentDefault ?: "none"}")
+                                    }
+                                    if (it.addedVersions.isNotEmpty()) add("added ${it.addedVersions.joinToString()}")
+                                    if (it.removedVersions.isNotEmpty()) add("removed ${it.removedVersions.joinToString()}")
                                 }
-                                if (it.addedVersions.isNotEmpty()) add("added ${it.addedVersions.joinToString()}")
-                                if (it.removedVersions.isNotEmpty()) add("removed ${it.removedVersions.joinToString()}")
-                            }
                             Text(
                                 summary.joinToString(" • "),
                                 style = MaterialTheme.typography.bodySmall,

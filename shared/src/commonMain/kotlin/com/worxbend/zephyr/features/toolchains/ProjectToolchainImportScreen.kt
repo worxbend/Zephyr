@@ -26,9 +26,7 @@ import com.worxbend.zephyr.features.toolchains.ProjectToolchainPresenter
 import com.worxbend.zephyr.viewmodel.ZephyrUiState
 
 @Composable
-internal fun ProjectToolchainImportScreen(
-    state: ZephyrUiState.Ready,
-) {
+internal fun ProjectToolchainImportScreen(state: ZephyrUiState.Ready) {
     val metrics = LocalZephyrMetrics.current
     val services = LocalAppServices.current
     val scope = rememberCoroutineScope()

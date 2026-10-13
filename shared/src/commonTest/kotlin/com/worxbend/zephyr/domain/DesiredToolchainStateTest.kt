@@ -7,29 +7,33 @@ import kotlin.test.assertTrue
 class DesiredToolchainStateTest {
     @Test
     fun driftIsDeterministicAndRemediationNeverRemovesExtraVersions() {
-        val desired = DesiredToolchainState(
-            sourceKind = DesiredStateSourceKind.Snapshot,
-            sourceLabel = "Release baseline",
-            candidates = listOf(
-                DesiredCandidateState("java", "21-tem", listOf("17-tem", "21-tem")),
-                DesiredCandidateState("gradle", "9.0", listOf("9.0")),
-            ),
-        )
-        val current = listOf(
-            candidate(
-                "java",
-                default = "17-tem",
-                versions = listOf(
-                    CandidateVersion("17-tem", true, true, RemoteAvailability.Available),
-                    CandidateVersion("11-tem", true, false, RemoteAvailability.Available),
+        val desired =
+            DesiredToolchainState(
+                sourceKind = DesiredStateSourceKind.Snapshot,
+                sourceLabel = "Release baseline",
+                candidates =
+                    listOf(
+                        DesiredCandidateState("java", "21-tem", listOf("17-tem", "21-tem")),
+                        DesiredCandidateState("gradle", "9.0", listOf("9.0")),
+                    ),
+            )
+        val current =
+            listOf(
+                candidate(
+                    "java",
+                    default = "17-tem",
+                    versions =
+                        listOf(
+                            CandidateVersion("17-tem", true, true, RemoteAvailability.Available),
+                            CandidateVersion("11-tem", true, false, RemoteAvailability.Available),
+                        ),
                 ),
-            ),
-            candidate(
-                "kotlin",
-                default = "2.2",
-                versions = listOf(CandidateVersion("2.2", true, true, RemoteAvailability.Available)),
-            ),
-        )
+                candidate(
+                    "kotlin",
+                    default = "2.2",
+                    versions = listOf(CandidateVersion("2.2", true, true, RemoteAvailability.Available)),
+                ),
+            )
 
         val drift = calculateDesiredStateDrift(desired, current)
 
@@ -59,20 +63,23 @@ class DesiredToolchainStateTest {
 
     @Test
     fun reportsDesiredVersionsThatAreVerifiedLocalOnly() {
-        val desired = DesiredToolchainState(
-            sourceKind = DesiredStateSourceKind.Profile,
-            sourceLabel = "Legacy",
-            candidates = listOf(DesiredCandidateState("java", "17-tem", listOf("17-tem"))),
-        )
-        val current = listOf(
-            candidate(
-                "java",
-                default = "17-tem",
-                versions = listOf(
-                    CandidateVersion("17-tem", true, true, RemoteAvailability.LocalOnly),
+        val desired =
+            DesiredToolchainState(
+                sourceKind = DesiredStateSourceKind.Profile,
+                sourceLabel = "Legacy",
+                candidates = listOf(DesiredCandidateState("java", "17-tem", listOf("17-tem"))),
+            )
+        val current =
+            listOf(
+                candidate(
+                    "java",
+                    default = "17-tem",
+                    versions =
+                        listOf(
+                            CandidateVersion("17-tem", true, true, RemoteAvailability.LocalOnly),
+                        ),
                 ),
-            ),
-        )
+            )
 
         val drift = calculateDesiredStateDrift(desired, current)
 

@@ -24,11 +24,12 @@ class UpdateCenterTest {
 
     @Test
     fun classifiesInstalledStableVersionThatIsNotDefaultAsInactiveAndSelectable() {
-        val installed = candidate(
-            name = "gradle",
-            defaultVersion = "8.10",
-            installedVersions = listOf("8.10", "8.14"),
-        )
+        val installed =
+            candidate(
+                name = "gradle",
+                defaultVersion = "8.10",
+                installedVersions = listOf("8.10", "8.14"),
+            )
         val catalog = catalog("gradle", "8.14")
 
         assertEquals(
@@ -51,11 +52,12 @@ class UpdateCenterTest {
 
     @Test
     fun updateOnlyPolicyNotifiesWithoutOpeningBrowse() {
-        val notification = updateNotification(
-            policy = UpdateNotificationPolicy.UpdatesOnly,
-            candidates = listOf(candidate("gradle", "8.10")),
-            catalog = listOf(catalog("gradle", "8.14")),
-        )
+        val notification =
+            updateNotification(
+                policy = UpdateNotificationPolicy.UpdatesOnly,
+                candidates = listOf(candidate("gradle", "8.10")),
+                catalog = listOf(catalog("gradle", "8.14")),
+            )
 
         assertEquals("1 toolchain update available", notification?.title)
         assertEquals("Gradle 8.14 (install and activate)", notification?.message)
@@ -64,13 +66,15 @@ class UpdateCenterTest {
 
     @Test
     fun notificationDistinguishesInstalledActivationFromMissingDownload() {
-        val notification = updateNotification(
-            policy = UpdateNotificationPolicy.UpdatesOnly,
-            candidates = listOf(
-                candidate("gradle", "8.10", listOf("8.10", "8.14")),
-            ),
-            catalog = listOf(catalog("gradle", "8.14")),
-        )
+        val notification =
+            updateNotification(
+                policy = UpdateNotificationPolicy.UpdatesOnly,
+                candidates =
+                    listOf(
+                        candidate("gradle", "8.10", listOf("8.10", "8.14")),
+                    ),
+                catalog = listOf(catalog("gradle", "8.14")),
+            )
 
         assertEquals("1 stable update ready to activate", notification?.title)
         assertEquals("Gradle 8.14 (activate installed)", notification?.message)
@@ -104,16 +108,20 @@ class UpdateCenterTest {
         name = name,
         displayName = name.replaceFirstChar { it.titlecase() },
         kind = CandidateKind.Sdk,
-        installedVersions = installedVersions.map {
-            CandidateVersion(it, true, it == defaultVersion, true)
-        },
+        installedVersions =
+            installedVersions.map {
+                CandidateVersion(it, true, it == defaultVersion, true)
+            },
         defaultVersion = defaultVersion,
         hasLocalOnlyVersions = false,
         localOnlyVersionCount = 0,
         localOnlyVersions = emptyList(),
     )
 
-    private fun catalog(name: String, stableVersion: String) = CandidateCatalogItem(
+    private fun catalog(
+        name: String,
+        stableVersion: String,
+    ) = CandidateCatalogItem(
         name = name,
         displayName = name.replaceFirstChar { it.titlecase() },
         stableVersion = stableVersion,

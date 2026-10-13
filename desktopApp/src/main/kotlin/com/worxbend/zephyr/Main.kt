@@ -7,11 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
-import androidx.compose.ui.unit.dp
-import java.awt.Dimension
 import com.worxbend.zephyr.data.createActivityStore
 import com.worxbend.zephyr.data.createBrowserLauncher
 import com.worxbend.zephyr.data.createClipboardService
@@ -34,6 +33,7 @@ import com.worxbend.zephyr.settings.createAppSettingsRepository
 import com.worxbend.zephyr.viewmodel.ZephyrViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.awt.Dimension
 
 fun main() {
     val runtime = createRuntime()
@@ -42,6 +42,7 @@ fun main() {
         var closing by remember { mutableStateOf(false) }
         var closeInProgress by remember { mutableStateOf(false) }
         var closeFailure by remember { mutableStateOf<String?>(null) }
+
         fun requestClose(retry: Boolean = false) {
             if (closeInProgress) return
             closing = true
@@ -83,23 +84,25 @@ fun main() {
 /** The only production assembly point; common code receives ports, never adapter factories. */
 private fun createRuntime(): AppRuntime {
     val settings = AppSettingsStore(createAppSettingsRepository())
-    val viewModel = ZephyrViewModel(
-        repository = createSdkmanRepository(),
-        journalExporter = createOperationJournalExporter(),
-        diagnosticsExporter = createDiagnosticsExporter(),
-        operationStore = createOperationStore(),
-        activityStore = createActivityStore(),
-    )
-    val services = AppServices(
-        browserLauncher = createBrowserLauncher(),
-        clipboardService = createClipboardService(),
-        terminalLauncher = createTerminalLauncher(),
-        projectToolchainService = createProjectToolchainService(),
-        environmentSnapshotService = createEnvironmentSnapshotService(),
-        proxyConfigurationService = createProxyConfigurationService(),
-        sdkmanHomeConfigurationService = createSdkmanHomeConfigurationService(),
-        portablePreferencesService = createPortablePreferencesService(),
-    )
+    val viewModel =
+        ZephyrViewModel(
+            repository = createSdkmanRepository(),
+            journalExporter = createOperationJournalExporter(),
+            diagnosticsExporter = createDiagnosticsExporter(),
+            operationStore = createOperationStore(),
+            activityStore = createActivityStore(),
+        )
+    val services =
+        AppServices(
+            browserLauncher = createBrowserLauncher(),
+            clipboardService = createClipboardService(),
+            terminalLauncher = createTerminalLauncher(),
+            projectToolchainService = createProjectToolchainService(),
+            environmentSnapshotService = createEnvironmentSnapshotService(),
+            proxyConfigurationService = createProxyConfigurationService(),
+            sdkmanHomeConfigurationService = createSdkmanHomeConfigurationService(),
+            portablePreferencesService = createPortablePreferencesService(),
+        )
     val policies = AppPolicyCoordinator(viewModel.state, settings, createDesktopNotificationService(), viewModel::refreshMetadataIfIdle)
     return AppRuntime(viewModel, settings, services, policies)
 }

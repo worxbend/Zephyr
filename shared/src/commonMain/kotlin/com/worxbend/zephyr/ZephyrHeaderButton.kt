@@ -50,35 +50,40 @@ internal fun ZephyrHeaderButton(
     val pressed by interactions.collectIsPressedAsState()
     var focused by remember { mutableStateOf(false) }
     val shape = MaterialTheme.shapes.small
-    val fill = zephyrAnimatedColor(
-        when {
-            enabled && pressed -> MaterialTheme.colorScheme.surfaceContainerHighest
-            enabled && hovered -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> Color.Transparent
-        },
-    )
+    val fill =
+        zephyrAnimatedColor(
+            when {
+                enabled && pressed -> MaterialTheme.colorScheme.surfaceContainerHighest
+                enabled && hovered -> MaterialTheme.colorScheme.surfaceContainerHigh
+                else -> Color.Transparent
+            },
+        )
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
         tooltip = { PlainTooltip { Text(label) } },
         state = rememberTooltipState(),
     ) {
         Box(
-            modifier = modifier
-                .size(LocalZephyrMetrics.current.controlHeight.coerceAtLeast(40.dp))
-                .alpha(if (enabled) 1f else 0.45f)
-                .clip(shape)
-                .background(fill)
-                .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-                .hoverable(interactions, enabled)
-                .onFocusChanged { focused = it.isFocused }
-                .semantics { contentDescription = if (badge == null) label else "$label, $badge unread" }
-                .clickable(interactions, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
+            modifier =
+                modifier
+                    .size(LocalZephyrMetrics.current.controlHeight.coerceAtLeast(40.dp))
+                    .alpha(if (enabled) 1f else 0.45f)
+                    .clip(shape)
+                    .background(fill)
+                    .border(2.dp, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+                    .hoverable(interactions, enabled)
+                    .onFocusChanged { focused = it.isFocused }
+                    .semantics { contentDescription = if (badge == null) label else "$label, $badge unread" }
+                    .clickable(interactions, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             ZephyrSymbol(icon)
             if (badge != null) {
                 Box(
-                    Modifier.align(Alignment.TopEnd).padding(6.dp).size(6.dp)
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(6.dp)
                         .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraLarge),
                 )
             }

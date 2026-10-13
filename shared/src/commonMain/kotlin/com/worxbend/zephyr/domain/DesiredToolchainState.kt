@@ -1,6 +1,8 @@
 package com.worxbend.zephyr.domain
 
-enum class DesiredStateSourceKind(val label: String) {
+enum class DesiredStateSourceKind(
+    val label: String,
+) {
     Profile("Profile"),
     Snapshot("Snapshot"),
 }
@@ -52,16 +54,19 @@ data class DesiredStateDrift(
     val localOnlyDesiredVersions: List<InstallTarget>,
 ) {
     val isAligned: Boolean
-        get() = missingVersions.isEmpty() &&
-            defaultChanges.isEmpty() &&
-            extraInstalledVersions.isEmpty()
+        get() =
+            missingVersions.isEmpty() &&
+                defaultChanges.isEmpty() &&
+                extraInstalledVersions.isEmpty()
 
     val remediationCommands: List<PlannedSdkmanCommand>
-        get() = missingVersions.map {
-            PlannedSdkmanCommand(SdkmanCommandAction.Install, it.candidate, it.version)
-        } + defaultChanges.map {
-            PlannedSdkmanCommand(SdkmanCommandAction.SetDefault, it.candidate, it.version)
-        }
+        get() =
+            missingVersions.map {
+                PlannedSdkmanCommand(SdkmanCommandAction.Install, it.candidate, it.version)
+            } +
+                defaultChanges.map {
+                    PlannedSdkmanCommand(SdkmanCommandAction.SetDefault, it.candidate, it.version)
+                }
 }
 
 fun calculateDesiredStateDrift(
@@ -70,48 +75,54 @@ fun calculateDesiredStateDrift(
 ): DesiredStateDrift {
     val currentByName = currentCandidates.associateBy(Candidate::name)
     val desiredByName = desired.candidates.associateBy(DesiredCandidateState::candidate)
-    val missing = desired.candidates
-        .sortedBy(DesiredCandidateState::candidate)
-        .flatMap { target ->
-            val installed = currentByName[target.candidate]
-                ?.installedVersions
-                .orEmpty()
-                .filter(CandidateVersion::isInstalled)
-                .map(CandidateVersion::version)
-                .toSet()
-            target.installedVersions
-                .filterNot { it in installed }
-                .sorted()
-                .map { InstallTarget(target.candidate, it) }
-        }
-    val defaults = desired.candidates
-        .sortedBy(DesiredCandidateState::candidate)
-        .mapNotNull { target ->
-            target.defaultVersion
-                ?.takeIf { it != currentByName[target.candidate]?.defaultVersion }
-                ?.let { InstallTarget(target.candidate, it) }
-        }
-    val extras = currentCandidates
-        .sortedBy(Candidate::name)
-        .flatMap { current ->
-            val desiredVersions = desiredByName[current.name]?.installedVersions.orEmpty().toSet()
-            current.installedVersions
-                .filter { it.isInstalled && it.version !in desiredVersions }
-                .map { InstallTarget(current.name, it.version) }
-                .sortedBy(InstallTarget::version)
-        }
-    val localOnlyDesired = desired.candidates
-        .sortedBy(DesiredCandidateState::candidate)
-        .flatMap { target ->
-            val versions = currentByName[target.candidate]
-                ?.installedVersions
-                .orEmpty()
-                .associateBy(CandidateVersion::version)
-            target.installedVersions
-                .filter { versions[it]?.remoteAvailability == RemoteAvailability.LocalOnly }
-                .sorted()
-                .map { InstallTarget(target.candidate, it) }
-        }
+    val missing =
+        desired.candidates
+            .sortedBy(DesiredCandidateState::candidate)
+            .flatMap { target ->
+                val installed =
+                    currentByName[target.candidate]
+                        ?.installedVersions
+                        .orEmpty()
+                        .filter(CandidateVersion::isInstalled)
+                        .map(CandidateVersion::version)
+                        .toSet()
+                target.installedVersions
+                    .filterNot { it in installed }
+                    .sorted()
+                    .map { InstallTarget(target.candidate, it) }
+            }
+    val defaults =
+        desired.candidates
+            .sortedBy(DesiredCandidateState::candidate)
+            .mapNotNull { target ->
+                target.defaultVersion
+                    ?.takeIf { it != currentByName[target.candidate]?.defaultVersion }
+                    ?.let { InstallTarget(target.candidate, it) }
+            }
+    val extras =
+        currentCandidates
+            .sortedBy(Candidate::name)
+            .flatMap { current ->
+                val desiredVersions = desiredByName[current.name]?.installedVersions.orEmpty().toSet()
+                current.installedVersions
+                    .filter { it.isInstalled && it.version !in desiredVersions }
+                    .map { InstallTarget(current.name, it.version) }
+                    .sortedBy(InstallTarget::version)
+            }
+    val localOnlyDesired =
+        desired.candidates
+            .sortedBy(DesiredCandidateState::candidate)
+            .flatMap { target ->
+                val versions =
+                    currentByName[target.candidate]
+                        ?.installedVersions
+                        .orEmpty()
+                        .associateBy(CandidateVersion::version)
+                target.installedVersions
+                    .filter { versions[it]?.remoteAvailability == RemoteAvailability.LocalOnly }
+                    .sorted()
+                    .map { InstallTarget(target.candidate, it) }
+            }
     return DesiredStateDrift(
         missingVersions = missing,
         defaultChanges = defaults,

@@ -1,129 +1,144 @@
 package com.worxbend.zephyr.settings
 
+import com.worxbend.zephyr.domain.DesiredCandidateState
+import com.worxbend.zephyr.domain.DesiredStateSourceKind
+import com.worxbend.zephyr.domain.DesiredToolchainState
+import com.worxbend.zephyr.domain.InstallTarget
+import com.worxbend.zephyr.domain.ProtectedVersion
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import com.worxbend.zephyr.domain.InstallTarget
-import com.worxbend.zephyr.domain.ProtectedVersion
-import com.worxbend.zephyr.domain.DesiredCandidateState
-import com.worxbend.zephyr.domain.DesiredStateSourceKind
-import com.worxbend.zephyr.domain.DesiredToolchainState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class AppSettingsStoreTest {
     @Test
-    fun loadsAndPersistsSettingsUpdates() = runBlocking {
-        val initial = AppSettings(
-            themePreference = ThemePreference.Dark,
-            uiDensity = UiDensity.Comfortable,
-            textScale = TextScale.Percent150,
-            motionPreference = MotionPreference.Reduced,
-            metadataRefreshSchedule = MetadataRefreshSchedule.EverySixHours,
-            updateNotificationPolicy = UpdateNotificationPolicy.UpdatesOnly,
-            operationNotificationPolicy = OperationNotificationPolicy.LongRunning,
-            cleanupGracePeriod = CleanupGracePeriod.ThirtyDays,
-            localOnlyObservations = listOf(
-                LocalOnlyObservation("java", "17.0.1-tem", 1_000L),
-            ),
-            showSdkmanHome = false,
-            favoriteCandidates = setOf("gradle", "kotlin"),
-            favoriteJdkVendors = setOf("tem", "zulu"),
-            recentCandidates = listOf("kotlin", "gradle"),
-            toolchainProfiles = listOf(
-                ToolchainProfile("Backend", listOf(InstallTarget("java", "21.0.5-tem"))),
-            ),
-            projectWorkspaces = listOf(
-                ProjectWorkspaceReference("/srv/backend/.sdkmanrc", "Backend"),
-            ),
-            desiredToolchainState = DesiredToolchainState(
-                sourceKind = DesiredStateSourceKind.Profile,
-                sourceLabel = "Backend",
-                candidates = listOf(DesiredCandidateState("java", "21.0.5-tem", listOf("21.0.5-tem"))),
-            ),
-            navigationWidthDp = 286,
-            installedViewMode = CollectionViewMode.Table,
-            catalogViewMode = CollectionViewMode.Table,
-            savedJdkFilters = listOf(
-                SavedJdkFilter("Temurin", "", "Available", "tem", "Version"),
-            ),
-        )
-        val saved = CompletableDeferred<AppSettings>()
-        val repository = FakeAppSettingsRepository(initial) { saved.complete(it) }
-        val store = AppSettingsStore(repository, Dispatchers.Unconfined)
+    fun loadsAndPersistsSettingsUpdates() =
+        runBlocking {
+            val initial =
+                AppSettings(
+                    themePreference = ThemePreference.Dark,
+                    uiDensity = UiDensity.Comfortable,
+                    textScale = TextScale.Percent150,
+                    motionPreference = MotionPreference.Reduced,
+                    metadataRefreshSchedule = MetadataRefreshSchedule.EverySixHours,
+                    updateNotificationPolicy = UpdateNotificationPolicy.UpdatesOnly,
+                    operationNotificationPolicy = OperationNotificationPolicy.LongRunning,
+                    cleanupGracePeriod = CleanupGracePeriod.ThirtyDays,
+                    localOnlyObservations =
+                        listOf(
+                            LocalOnlyObservation("java", "17.0.1-tem", 1_000L),
+                        ),
+                    showSdkmanHome = false,
+                    favoriteCandidates = setOf("gradle", "kotlin"),
+                    favoriteJdkVendors = setOf("tem", "zulu"),
+                    recentCandidates = listOf("kotlin", "gradle"),
+                    toolchainProfiles =
+                        listOf(
+                            ToolchainProfile("Backend", listOf(InstallTarget("java", "21.0.5-tem"))),
+                        ),
+                    projectWorkspaces =
+                        listOf(
+                            ProjectWorkspaceReference("/srv/backend/.sdkmanrc", "Backend"),
+                        ),
+                    desiredToolchainState =
+                        DesiredToolchainState(
+                            sourceKind = DesiredStateSourceKind.Profile,
+                            sourceLabel = "Backend",
+                            candidates = listOf(DesiredCandidateState("java", "21.0.5-tem", listOf("21.0.5-tem"))),
+                        ),
+                    navigationWidthDp = 286,
+                    installedViewMode = CollectionViewMode.Table,
+                    catalogViewMode = CollectionViewMode.Table,
+                    savedJdkFilters =
+                        listOf(
+                            SavedJdkFilter("Temurin", "", "Available", "tem", "Version"),
+                        ),
+                )
+            val saved = CompletableDeferred<AppSettings>()
+            val repository = FakeAppSettingsRepository(initial) { saved.complete(it) }
+            val store = AppSettingsStore(repository, Dispatchers.Unconfined)
 
-        assertEquals(initial, withTimeout(1_000) { store.state.first { it == initial } })
+            assertEquals(initial, withTimeout(1_000) { store.state.first { it == initial } })
 
-        val updated = initial.copy(themePreference = ThemePreference.Light)
-        store.update { it.copy(themePreference = ThemePreference.Light) }
+            val updated = initial.copy(themePreference = ThemePreference.Light)
+            store.update { it.copy(themePreference = ThemePreference.Light) }
 
-        assertEquals(updated, withTimeout(1_000) { saved.await() })
-        assertEquals(updated, store.state.value)
-        store.close()
-    }
+            assertEquals(updated, withTimeout(1_000) { saved.await() })
+            assertEquals(updated, store.state.value)
+            store.close()
+        }
 
     @Test
-    fun jvmRepositoryPersistsFavoriteSets() = runBlocking {
-        val preferences = MemorySettingsPreferences().node("fixture")
-        try {
-            val repository = JvmAppSettingsRepository(preferences)
-            val expected = AppSettings(
-                favoriteCandidates = setOf("kotlin", "gradle"),
-                favoriteJdkVendors = setOf("zulu", "tem"),
-                textScale = TextScale.Percent200,
-                motionPreference = MotionPreference.Full,
-                metadataRefreshSchedule = MetadataRefreshSchedule.Daily,
-                updateNotificationPolicy = UpdateNotificationPolicy.AllChecks,
-                operationNotificationPolicy = OperationNotificationPolicy.AllCompletions,
-                cleanupGracePeriod = CleanupGracePeriod.NinetyDays,
-                localOnlyObservations = listOf(
-                    LocalOnlyObservation("gradle", "7.6", 234_567L),
-                    LocalOnlyObservation("java", "17.0.1-tem", 123_456L),
-                ),
-                recentCandidates = listOf("kotlin", "gradle"),
-                toolchainProfiles = listOf(
-                    ToolchainProfile(
-                        "Backend | JVM",
-                        listOf(
-                            InstallTarget("java", "21.0.5-tem"),
-                            InstallTarget("gradle", "8.14"),
-                        ),
-                    ),
-                ),
-                projectWorkspaces = listOf(
-                    ProjectWorkspaceReference("/work/backend/.sdkmanrc", "Backend"),
-                    ProjectWorkspaceReference("/work/mobile/.sdkmanrc", "Mobile"),
-                ),
-                desiredToolchainState = DesiredToolchainState(
-                    sourceKind = DesiredStateSourceKind.Snapshot,
-                    sourceLabel = "Snapshot 1234",
-                    candidates = listOf(
-                        DesiredCandidateState(
-                            "java",
-                            "21.0.5-tem",
-                            listOf("17.0.1-tem", "21.0.5-tem"),
-                        ),
-                        DesiredCandidateState("gradle", "8.14", listOf("8.14")),
-                    ),
-                ),
-                navigationWidthDp = 320,
-                installedViewMode = CollectionViewMode.Table,
-                catalogViewMode = CollectionViewMode.Table,
-                savedJdkFilters = listOf(
-                    SavedJdkFilter("Local Zulu", "17", "LocalOnly", "zulu", "Vendor"),
-                ),
-            )
+    fun jvmRepositoryPersistsFavoriteSets() =
+        runBlocking {
+            val preferences = MemorySettingsPreferences().node("fixture")
+            try {
+                val repository = JvmAppSettingsRepository(preferences)
+                val expected =
+                    AppSettings(
+                        favoriteCandidates = setOf("kotlin", "gradle"),
+                        favoriteJdkVendors = setOf("zulu", "tem"),
+                        textScale = TextScale.Percent200,
+                        motionPreference = MotionPreference.Full,
+                        metadataRefreshSchedule = MetadataRefreshSchedule.Daily,
+                        updateNotificationPolicy = UpdateNotificationPolicy.AllChecks,
+                        operationNotificationPolicy = OperationNotificationPolicy.AllCompletions,
+                        cleanupGracePeriod = CleanupGracePeriod.NinetyDays,
+                        localOnlyObservations =
+                            listOf(
+                                LocalOnlyObservation("gradle", "7.6", 234_567L),
+                                LocalOnlyObservation("java", "17.0.1-tem", 123_456L),
+                            ),
+                        recentCandidates = listOf("kotlin", "gradle"),
+                        toolchainProfiles =
+                            listOf(
+                                ToolchainProfile(
+                                    "Backend | JVM",
+                                    listOf(
+                                        InstallTarget("java", "21.0.5-tem"),
+                                        InstallTarget("gradle", "8.14"),
+                                    ),
+                                ),
+                            ),
+                        projectWorkspaces =
+                            listOf(
+                                ProjectWorkspaceReference("/work/backend/.sdkmanrc", "Backend"),
+                                ProjectWorkspaceReference("/work/mobile/.sdkmanrc", "Mobile"),
+                            ),
+                        desiredToolchainState =
+                            DesiredToolchainState(
+                                sourceKind = DesiredStateSourceKind.Snapshot,
+                                sourceLabel = "Snapshot 1234",
+                                candidates =
+                                    listOf(
+                                        DesiredCandidateState(
+                                            "java",
+                                            "21.0.5-tem",
+                                            listOf("17.0.1-tem", "21.0.5-tem"),
+                                        ),
+                                        DesiredCandidateState("gradle", "8.14", listOf("8.14")),
+                                    ),
+                            ),
+                        navigationWidthDp = 320,
+                        installedViewMode = CollectionViewMode.Table,
+                        catalogViewMode = CollectionViewMode.Table,
+                        savedJdkFilters =
+                            listOf(
+                                SavedJdkFilter("Local Zulu", "17", "LocalOnly", "zulu", "Vendor"),
+                            ),
+                    )
 
-            repository.save(expected)
+                repository.save(expected)
 
-            assertEquals(expected, repository.load())
-        } finally {
-            preferences.removeNode()
-            preferences.flush()
+                assertEquals(expected, repository.load())
+            } finally {
+                preferences.removeNode()
+                preferences.flush()
+            }
         }
-    }
 
     @Test
     fun recentCandidatesAreDeduplicatedAndBounded() {
@@ -176,10 +191,11 @@ class AppSettingsStoreTest {
 
     @Test
     fun disabledCleanupPolicyClearsObservationMetadata() {
-        val settings = AppSettings(
-            cleanupGracePeriod = CleanupGracePeriod.Off,
-            localOnlyObservations = listOf(LocalOnlyObservation("java", "17", 1L)),
-        )
+        val settings =
+            AppSettings(
+                cleanupGracePeriod = CleanupGracePeriod.Off,
+                localOnlyObservations = listOf(LocalOnlyObservation("java", "17", 1L)),
+            )
 
         assertEquals(
             emptyList(),

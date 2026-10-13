@@ -24,17 +24,23 @@ data class ProxySaveResult(
 
 interface ProxyConfigurationService {
     suspend fun load(): ProxyConfiguration
-    suspend fun save(configuration: ProxyConfiguration, newPassword: String?): ProxySaveResult
+
+    suspend fun save(
+        configuration: ProxyConfiguration,
+        newPassword: String?,
+    ): ProxySaveResult
+
     suspend fun clearPassword(): ProxySaveResult
 }
 
 expect fun createProxyConfigurationService(): ProxyConfigurationService
 
-fun ProxyConfiguration.validationError(): String? = when {
-    host.isBlank() && enabled -> "Proxy host is required."
-    host.any { it.isWhitespace() || it.code < 0x20 } -> "Proxy host cannot contain whitespace or control characters."
-    host.contains('/') || host.contains('@') || host.contains(':') -> "Enter a hostname without a scheme, path, or credentials."
-    port !in 1..65_535 -> "Proxy port must be between 1 and 65535."
-    username.any { it.code < 0x20 || it == '\n' || it == '\r' } -> "Proxy username contains invalid characters."
-    else -> null
-}
+fun ProxyConfiguration.validationError(): String? =
+    when {
+        host.isBlank() && enabled -> "Proxy host is required."
+        host.any { it.isWhitespace() || it.code < 0x20 } -> "Proxy host cannot contain whitespace or control characters."
+        host.contains('/') || host.contains('@') || host.contains(':') -> "Enter a hostname without a scheme, path, or credentials."
+        port !in 1..65_535 -> "Proxy port must be between 1 and 65535."
+        username.any { it.code < 0x20 || it == '\n' || it == '\r' } -> "Proxy username contains invalid characters."
+        else -> null
+    }

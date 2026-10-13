@@ -24,10 +24,11 @@ internal fun operationNotification(
     return OperationNotification(
         entryId = entry.id,
         title = if (succeeded) "Toolchain operation completed" else "Toolchain operation needs attention",
-        message = if (succeeded) {
-            "$stepCount reviewed step(s) completed in Zephyr."
-        } else {
-            "$stepCount reviewed step(s) finished with a failure. Open Task Center for details."
-        },
+        message =
+            if (succeeded) {
+                "$stepCount reviewed step(s) completed in Zephyr."
+            } else {
+                "$stepCount reviewed step(s) finished with a failure. Open Task Center for details."
+            },
     )
 }

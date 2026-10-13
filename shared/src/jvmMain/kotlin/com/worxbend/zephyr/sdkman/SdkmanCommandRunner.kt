@@ -7,20 +7,43 @@ import kotlin.time.Duration
 
 sealed interface SdkmanCommand {
     data object Version : SdkmanCommand
+
     data object ListCandidates : SdkmanCommand
+
     data object UpdateCandidateMetadata : SdkmanCommand
+
     data object SelfUpdate : SdkmanCommand
-    data class ListVersions(val candidate: String) : SdkmanCommand
-    data class Install(val candidate: String, val version: String) : SdkmanCommand
-    data class Uninstall(val candidate: String, val version: String) : SdkmanCommand
-    data class SetDefault(val candidate: String, val version: String) : SdkmanCommand
+
+    data class ListVersions(
+        val candidate: String,
+    ) : SdkmanCommand
+
+    data class Install(
+        val candidate: String,
+        val version: String,
+    ) : SdkmanCommand
+
+    data class Uninstall(
+        val candidate: String,
+        val version: String,
+    ) : SdkmanCommand
+
+    data class SetDefault(
+        val candidate: String,
+        val version: String,
+    ) : SdkmanCommand
+
     data class ConnectivityProbe(
         val route: ConnectivityRouteKind,
     ) : SdkmanCommand
 }
 
 interface SdkmanCommandRunner {
-    suspend fun run(command: SdkmanCommand, timeout: Duration): SdkmanCommandResult
+    suspend fun run(
+        command: SdkmanCommand,
+        timeout: Duration,
+    ): SdkmanCommandResult
+
     suspend fun diagnoseConnectivity(timeout: Duration): ConnectivityDiagnostic =
         ConnectivityDiagnostic(
             route = ConnectivityRouteKind.Direct,

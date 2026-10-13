@@ -5,6 +5,7 @@ import java.util.prefs.Preferences
 
 interface ProtectedVersionStore {
     fun load(): Set<ProtectedVersion>
+
     fun save(versions: Set<ProtectedVersion>)
 }
 
@@ -24,19 +25,20 @@ internal class PreferencesProtectedVersionStore(
     private val preferences: Preferences = Preferences.userNodeForPackage(PreferencesProtectedVersionStore::class.java),
 ) : ProtectedVersionStore {
     override fun load(): Set<ProtectedVersion> =
-        preferences.get(PROTECTED_VERSIONS_KEY, "")
+        preferences
+            .get(PROTECTED_VERSIONS_KEY, "")
             .lineSequence()
             .mapNotNull { line ->
                 val candidate = line.substringBefore('\t', missingDelimiterValue = "")
                 val version = line.substringAfter('\t', missingDelimiterValue = "")
                 runCatching { ProtectedVersion(candidate, version) }.getOrNull()
-            }
-            .toSet()
+            }.toSet()
 
     override fun save(versions: Set<ProtectedVersion>) {
-        val serialized = versions
-            .sortedWith(compareBy(ProtectedVersion::candidate, ProtectedVersion::version))
-            .joinToString("\n") { "${it.candidate}\t${it.version}" }
+        val serialized =
+            versions
+                .sortedWith(compareBy(ProtectedVersion::candidate, ProtectedVersion::version))
+                .joinToString("\n") { "${it.candidate}\t${it.version}" }
         require(serialized.length <= MAX_PREFERENCES_VALUE_LENGTH) {
             "Too many protected versions to persist."
         }

@@ -37,6 +37,7 @@ data class EnvironmentSnapshotExportResult(
 
 interface EnvironmentSnapshotService {
     suspend fun chooseAndRead(): EnvironmentSnapshot?
+
     suspend fun chooseAndWrite(snapshot: EnvironmentSnapshot): EnvironmentSnapshotExportResult?
 }
 
@@ -48,22 +49,23 @@ fun captureEnvironmentSnapshot(
 ): EnvironmentSnapshot =
     EnvironmentSnapshot(
         capturedAtEpochMillis = capturedAtEpochMillis,
-        candidates = candidates
-            .map { candidate ->
-                SnapshotCandidate(
-                    candidate = candidate.name,
-                    defaultVersion = candidate.defaultVersion,
-                    installedVersions = candidate.installedVersions
-                        .asSequence()
-                        .filter { it.isInstalled }
-                        .map { it.version }
-                        .distinct()
-                        .sorted()
-                        .toList(),
-                )
-            }
-            .filter { it.defaultVersion != null || it.installedVersions.isNotEmpty() }
-            .sortedBy(SnapshotCandidate::candidate),
+        candidates =
+            candidates
+                .map { candidate ->
+                    SnapshotCandidate(
+                        candidate = candidate.name,
+                        defaultVersion = candidate.defaultVersion,
+                        installedVersions =
+                            candidate.installedVersions
+                                .asSequence()
+                                .filter { it.isInstalled }
+                                .map { it.version }
+                                .distinct()
+                                .sorted()
+                                .toList(),
+                    )
+                }.filter { it.defaultVersion != null || it.installedVersions.isNotEmpty() }
+                .sortedBy(SnapshotCandidate::candidate),
     )
 
 fun diffEnvironmentSnapshots(
@@ -86,8 +88,7 @@ fun diffEnvironmentSnapshots(
                 addedVersions = (afterVersions - beforeVersions).sorted(),
                 removedVersions = (beforeVersions - afterVersions).sorted(),
             )
-        }
-        .filter(SnapshotCandidateDiff::hasChanges)
+        }.filter(SnapshotCandidateDiff::hasChanges)
 }
 
 fun planSnapshotRestore(
@@ -95,31 +96,34 @@ fun planSnapshotRestore(
     currentCandidates: List<Candidate>,
 ): List<PlannedSdkmanCommand> {
     val currentByName = currentCandidates.associateBy(Candidate::name)
-    val installs = snapshot.candidates
-        .sortedBy(SnapshotCandidate::candidate)
-        .flatMap { target ->
-            val installed = currentByName[target.candidate]
-                ?.installedVersions
-                .orEmpty()
-                .filter { it.isInstalled }
-                .map { it.version }
-                .toSet()
-            target.installedVersions
-                .filterNot { it in installed }
-                .sorted()
-                .map { version ->
-                    PlannedSdkmanCommand(SdkmanCommandAction.Install, target.candidate, version)
-                }
-        }
-    val defaults = snapshot.candidates
-        .sortedBy(SnapshotCandidate::candidate)
-        .mapNotNull { target ->
-            target.defaultVersion
-                ?.takeIf { it != currentByName[target.candidate]?.defaultVersion }
-                ?.let { version ->
-                    PlannedSdkmanCommand(SdkmanCommandAction.SetDefault, target.candidate, version)
-                }
-        }
+    val installs =
+        snapshot.candidates
+            .sortedBy(SnapshotCandidate::candidate)
+            .flatMap { target ->
+                val installed =
+                    currentByName[target.candidate]
+                        ?.installedVersions
+                        .orEmpty()
+                        .filter { it.isInstalled }
+                        .map { it.version }
+                        .toSet()
+                target.installedVersions
+                    .filterNot { it in installed }
+                    .sorted()
+                    .map { version ->
+                        PlannedSdkmanCommand(SdkmanCommandAction.Install, target.candidate, version)
+                    }
+            }
+    val defaults =
+        snapshot.candidates
+            .sortedBy(SnapshotCandidate::candidate)
+            .mapNotNull { target ->
+                target.defaultVersion
+                    ?.takeIf { it != currentByName[target.candidate]?.defaultVersion }
+                    ?.let { version ->
+                        PlannedSdkmanCommand(SdkmanCommandAction.SetDefault, target.candidate, version)
+                    }
+            }
     return installs + defaults
 }
 
@@ -135,7 +139,12 @@ fun renderEnvironmentSnapshot(snapshot: EnvironmentSnapshot): String =
                 append('\t')
                 append(candidate.defaultVersion.orEmpty())
                 append('\t')
-                appendLine(candidate.installedVersions.distinct().sorted().joinToString(","))
+                appendLine(
+                    candidate.installedVersions
+                        .distinct()
+                        .sorted()
+                        .joinToString(","),
+                )
             }
     }
 
@@ -144,28 +153,31 @@ fun parseEnvironmentSnapshot(content: String): EnvironmentSnapshot {
     require(lines.firstOrNull() == "zephyr-environment-snapshot=$CURRENT_SNAPSHOT_SCHEMA") {
         "Unsupported or missing Zephyr snapshot schema."
     }
-    val capturedAt = lines.getOrNull(1)
-        ?.removePrefix("captured-at-epoch-millis=")
-        ?.takeIf { lines[1].startsWith("captured-at-epoch-millis=") }
-        ?.toLongOrNull()
-        ?: error("Snapshot capture timestamp is missing or invalid.")
-    val candidates = lines.drop(2).mapIndexed { index, line ->
-        require(line.startsWith("candidate=")) { "Line ${index + 3}: expected a candidate entry." }
-        val fields = line.removePrefix("candidate=").split('\t')
-        require(fields.size == 3) { "Line ${index + 3}: malformed candidate entry." }
-        val candidate = fields[0]
-        val defaultVersion = fields[1].ifBlank { null }
-        val versions = fields[2].split(',').filter(String::isNotBlank)
-        require(isValidSdkmanCandidateName(candidate)) { "Line ${index + 3}: invalid candidate key." }
-        require(defaultVersion == null || isValidSdkmanVersion(defaultVersion)) {
-            "Line ${index + 3}: invalid default version."
+    val capturedAt =
+        lines
+            .getOrNull(1)
+            ?.removePrefix("captured-at-epoch-millis=")
+            ?.takeIf { lines[1].startsWith("captured-at-epoch-millis=") }
+            ?.toLongOrNull()
+            ?: error("Snapshot capture timestamp is missing or invalid.")
+    val candidates =
+        lines.drop(2).mapIndexed { index, line ->
+            require(line.startsWith("candidate=")) { "Line ${index + 3}: expected a candidate entry." }
+            val fields = line.removePrefix("candidate=").split('\t')
+            require(fields.size == 3) { "Line ${index + 3}: malformed candidate entry." }
+            val candidate = fields[0]
+            val defaultVersion = fields[1].ifBlank { null }
+            val versions = fields[2].split(',').filter(String::isNotBlank)
+            require(isValidSdkmanCandidateName(candidate)) { "Line ${index + 3}: invalid candidate key." }
+            require(defaultVersion == null || isValidSdkmanVersion(defaultVersion)) {
+                "Line ${index + 3}: invalid default version."
+            }
+            require(versions.all(::isValidSdkmanVersion)) { "Line ${index + 3}: invalid installed version." }
+            require(defaultVersion == null || defaultVersion in versions) {
+                "Line ${index + 3}: default version is not included in installed versions."
+            }
+            SnapshotCandidate(candidate, defaultVersion, versions.distinct().sorted())
         }
-        require(versions.all(::isValidSdkmanVersion)) { "Line ${index + 3}: invalid installed version." }
-        require(defaultVersion == null || defaultVersion in versions) {
-            "Line ${index + 3}: default version is not included in installed versions."
-        }
-        SnapshotCandidate(candidate, defaultVersion, versions.distinct().sorted())
-    }
     require(candidates.distinctBy(SnapshotCandidate::candidate).size == candidates.size) {
         "Snapshot contains duplicate candidate entries."
     }

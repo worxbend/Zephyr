@@ -26,7 +26,9 @@ class DomainContractTest {
     @Test
     fun commandSuccessCannotDisagreeWithVerificationStatus() {
         for (status in CommandOutcomeStatus.entries) {
-            val succeeded = status in setOf(CommandOutcomeStatus.Applied, CommandOutcomeStatus.AppliedWithWarning, CommandOutcomeStatus.AlreadySatisfied)
+            val succeeded =
+                status in
+                    setOf(CommandOutcomeStatus.Applied, CommandOutcomeStatus.AppliedWithWarning, CommandOutcomeStatus.AlreadySatisfied)
             assertEquals(succeeded, CommandOutcome(succeeded, "fixture", status).success)
             assertFailsWith<IllegalArgumentException> { CommandOutcome(!succeeded, "fixture", status) }
         }

@@ -27,7 +27,16 @@ fun AppShutdownScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(if (failure == null) "Closing Zephyr…" else "Shutdown needs attention", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    if (failure ==
+                        null
+                    ) {
+                        "Closing Zephyr…"
+                    } else {
+                        "Shutdown needs attention"
+                    },
+                    style = MaterialTheme.typography.headlineMedium,
+                )
                 if (failure == null) {
                     ZephyrProgressIndicator()
                     Text("Stopping tasks and confirming saved settings.")

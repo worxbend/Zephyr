@@ -72,7 +72,14 @@ internal fun OverviewScreen(
                 ZephyrMetricTile(
                     label = "Default JDK",
                     value = jdk?.defaultVersion ?: "Not set",
-                    detail = if (jdk == null) "Install a JDK to get started" else "${jdk.installedVersions.count { it.isInstalled }} installed",
+                    detail =
+                        if (jdk ==
+                            null
+                        ) {
+                            "Install a JDK to get started"
+                        } else {
+                            "${jdk.installedVersions.count { it.isInstalled }} installed"
+                        },
                     tone = if (jdk?.defaultVersion != null) StatusTone.Success else StatusTone.Warning,
                     modifier = tileModifier,
                 )
@@ -246,9 +253,10 @@ internal fun OverviewScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             settings.favoriteCandidates.sorted().forEach { candidate ->
-                                val label = state.catalog.firstOrNull { it.name == candidate }?.displayName
-                                    ?: state.candidates.firstOrNull { it.name == candidate }?.displayName
-                                    ?: displayNameFor(candidate)
+                                val label =
+                                    state.catalog.firstOrNull { it.name == candidate }?.displayName
+                                        ?: state.candidates.firstOrNull { it.name == candidate }?.displayName
+                                        ?: displayNameFor(candidate)
                                 ZephyrToolbarButton(
                                     label = "★ $label",
                                     onClick = { viewModel.navigate(ZephyrRoute.SdkDetail(candidate)) },
@@ -364,6 +372,7 @@ internal fun UpdateCenterScreen(
                     Text("Loading SDKMAN update metadata…")
                 }
             }
+
             state.catalog.isEmpty() -> {
                 EmptyState(
                     "Update metadata unavailable",
@@ -373,6 +382,7 @@ internal fun UpdateCenterScreen(
                     viewModel.requestTransaction(SdkmanTransaction.RefreshMetadata)
                 }
             }
+
             updates.isEmpty() -> {
                 EmptyState(
                     "Toolchain is current",
@@ -382,6 +392,7 @@ internal fun UpdateCenterScreen(
                     viewModel.navigate(ZephyrRoute.BrowseSdks)
                 }
             }
+
             else -> {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -404,15 +415,16 @@ internal fun UpdateCenterScreen(
                     ZephyrToolbarButton(
                         label = "Review selected (${selected.size})",
                         onClick = {
-                            val targets = updates
-                                .filter { "${it.candidate}:${it.targetVersion}" in selected }
-                                .map {
-                                    UpdateActivationTarget(
-                                        it.candidate,
-                                        it.targetVersion,
-                                        requiresInstall = it.state == StableTargetState.Missing,
-                                    )
-                                }
+                            val targets =
+                                updates
+                                    .filter { "${it.candidate}:${it.targetVersion}" in selected }
+                                    .map {
+                                        UpdateActivationTarget(
+                                            it.candidate,
+                                            it.targetVersion,
+                                            requiresInstall = it.state == StableTargetState.Missing,
+                                        )
+                                    }
                             if (targets.isNotEmpty()) {
                                 viewModel.requestTransaction(SdkmanTransaction.UpdateActivation(targets))
                             }
@@ -433,13 +445,16 @@ internal fun UpdateCenterScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Badge(item.status.label, when (item.status) {
-                                        BatchItemStatus.Succeeded -> BadgeTone.Success
-                                        BatchItemStatus.Failed -> BadgeTone.Error
-                                        BatchItemStatus.Skipped -> BadgeTone.Warning
-                                        BatchItemStatus.Running -> BadgeTone.Primary
-                                        BatchItemStatus.Pending -> BadgeTone.Neutral
-                                    })
+                                    Badge(
+                                        item.status.label,
+                                        when (item.status) {
+                                            BatchItemStatus.Succeeded -> BadgeTone.Success
+                                            BatchItemStatus.Failed -> BadgeTone.Error
+                                            BatchItemStatus.Skipped -> BadgeTone.Warning
+                                            BatchItemStatus.Running -> BadgeTone.Primary
+                                            BatchItemStatus.Pending -> BadgeTone.Neutral
+                                        },
+                                    )
                                     Text(
                                         "${item.command.action.label}: ${item.command.candidate} ${item.command.version}",
                                         modifier = Modifier.weight(1f),
@@ -470,40 +485,43 @@ internal fun UpdateCenterScreen(
                                 ZephyrRecordLayout(
                                     modifier = Modifier.fillMaxWidth().padding(metrics.panelPadding),
                                     content = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                    Checkbox(
-                                        checked = id in selected,
-                                        onCheckedChange = { checked ->
-                                            selected = if (checked) selected + id else selected - id
-                                        },
-                                    )
-                                    CandidateIcon(update.kind)
-                                    Column(
-                                        modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                                    ) {
-                                        Text(update.displayName, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "${update.currentVersion ?: "No default"} → ${update.targetVersion}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                        FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                            Badge("SDKMAN key: ${update.candidate}")
-                                            Badge("Stable target", BadgeTone.Success)
-                                            Badge(
-                                                update.state.label,
-                                                if (update.state == StableTargetState.Missing) {
-                                                    BadgeTone.Warning
-                                                } else {
-                                                    BadgeTone.Primary
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            Checkbox(
+                                                checked = id in selected,
+                                                onCheckedChange = { checked ->
+                                                    selected = if (checked) selected + id else selected - id
                                                 },
                                             )
+                                            CandidateIcon(update.kind)
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                                            ) {
+                                                Text(update.displayName, fontWeight = FontWeight.SemiBold)
+                                                Text(
+                                                    "${update.currentVersion ?: "No default"} → ${update.targetVersion}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                )
+                                                FlowRow(
+                                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                                                ) {
+                                                    Badge("SDKMAN key: ${update.candidate}")
+                                                    Badge("Stable target", BadgeTone.Success)
+                                                    Badge(
+                                                        update.state.label,
+                                                        if (update.state == StableTargetState.Missing) {
+                                                            BadgeTone.Warning
+                                                        } else {
+                                                            BadgeTone.Primary
+                                                        },
+                                                    )
+                                                }
+                                            }
                                         }
-                                    }
-                                    }
                                     },
                                 ) {
                                     ZephyrToolbarButton(
@@ -522,11 +540,12 @@ internal fun UpdateCenterScreen(
                                         ZephyrToolbarButton(
                                             label = "Release notes",
                                             onClick = {
-                                                releaseNotesMessage = if (browserLauncher.openHttps(url)) {
-                                                    "Opened upstream release notes for ${update.displayName}."
-                                                } else {
-                                                    "A browser could not be opened for the validated release-notes URL."
-                                                }
+                                                releaseNotesMessage =
+                                                    if (browserLauncher.openHttps(url)) {
+                                                        "Opened upstream release notes for ${update.displayName}."
+                                                    } else {
+                                                        "A browser could not be opened for the validated release-notes URL."
+                                                    }
                                             },
                                         )
                                     }
@@ -625,8 +644,16 @@ internal fun DiagnosticsScreen(
                 Column(Modifier.padding(metrics.panelPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     PanelHeading("Remote metadata", "Catalog and updater state")
                     DiagnosticRow("Catalog packages", state.catalog.size.toString(), state.catalog.isNotEmpty())
-                    DiagnosticRow("Metadata", metadataShortLabel(state.sdkmanStatus.metadataStatus), state.sdkmanStatus.metadataStatus !is CandidateMetadataStatus.Failed)
-                    DiagnosticRow("SDKMAN update", selfUpdateShortLabel(state.sdkmanStatus.selfUpdateStatus), state.sdkmanStatus.selfUpdateStatus !is SdkmanSelfUpdateStatus.Failed)
+                    DiagnosticRow(
+                        "Metadata",
+                        metadataShortLabel(state.sdkmanStatus.metadataStatus),
+                        state.sdkmanStatus.metadataStatus !is CandidateMetadataStatus.Failed,
+                    )
+                    DiagnosticRow(
+                        "SDKMAN update",
+                        selfUpdateShortLabel(state.sdkmanStatus.selfUpdateStatus),
+                        state.sdkmanStatus.selfUpdateStatus !is SdkmanSelfUpdateStatus.Failed,
+                    )
                     DiagnosticRow(
                         "Local-only findings",
                         state.candidates.sumOf { it.localOnlyVersionCount }.toString(),
@@ -664,11 +691,12 @@ internal fun DiagnosticsScreen(
 
 @Composable
 private fun IntegrityCheckRow(check: IntegrityCheck) {
-    val tone = when (check.status) {
-        IntegrityStatus.Passed -> StatusTone.Success
-        IntegrityStatus.Warning -> StatusTone.Warning
-        IntegrityStatus.Failed -> StatusTone.Error
-    }
+    val tone =
+        when (check.status) {
+            IntegrityStatus.Passed -> StatusTone.Success
+            IntegrityStatus.Warning -> StatusTone.Warning
+            IntegrityStatus.Failed -> StatusTone.Error
+        }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.Top,
@@ -682,11 +710,14 @@ private fun IntegrityCheckRow(check: IntegrityCheck) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(check.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-                Badge(check.status.label, when (check.status) {
-                    IntegrityStatus.Passed -> BadgeTone.Success
-                    IntegrityStatus.Warning -> BadgeTone.Warning
-                    IntegrityStatus.Failed -> BadgeTone.Error
-                })
+                Badge(
+                    check.status.label,
+                    when (check.status) {
+                        IntegrityStatus.Passed -> BadgeTone.Success
+                        IntegrityStatus.Warning -> BadgeTone.Warning
+                        IntegrityStatus.Failed -> BadgeTone.Error
+                    },
+                )
             }
             Text(
                 check.detail,
@@ -701,7 +732,12 @@ private fun IntegrityCheckRow(check: IntegrityCheck) {
 internal fun AboutScreen(state: ZephyrUiState.Ready) {
     val metrics = LocalZephyrMetrics.current
     Column(
-        modifier = Modifier.fillMaxHeight().widthIn(max = 840.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .widthIn(max = 840.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(metrics.spacing * 2),
     ) {
         PageTitle("About Zephyr", "A focused desktop control center for SDKMAN.")
@@ -741,12 +777,18 @@ internal fun AboutScreen(state: ZephyrUiState.Ready) {
 }
 
 @Composable
-internal fun PanelHeading(title: String, detail: String) {
+internal fun PanelHeading(
+    title: String,
+    detail: String,
+) {
     ZephyrSectionHeading(title = title, detail = detail)
 }
 
 @Composable
-internal fun KeyValueRow(label: String, value: String) {
+internal fun KeyValueRow(
+    label: String,
+    value: String,
+) {
     BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         if (maxWidth < 520.dp * zephyrContentScale()) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -755,7 +797,12 @@ internal fun KeyValueRow(label: String, value: String) {
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Text(label, modifier = Modifier.weight(0.4f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    label,
+                    modifier = Modifier.weight(0.4f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(value, modifier = Modifier.weight(0.6f), style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -763,7 +810,10 @@ internal fun KeyValueRow(label: String, value: String) {
 }
 
 @Composable
-private fun HealthRow(label: String, healthy: Boolean) {
+private fun HealthRow(
+    label: String,
+    healthy: Boolean,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         StatusDot(if (healthy) StatusTone.Success else StatusTone.Warning)
         Text(label)
@@ -771,7 +821,11 @@ private fun HealthRow(label: String, healthy: Boolean) {
 }
 
 @Composable
-private fun DiagnosticRow(label: String, value: String, healthy: Boolean) {
+private fun DiagnosticRow(
+    label: String,
+    value: String,
+    healthy: Boolean,
+) {
     ZephyrRecordLayout(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         content = {

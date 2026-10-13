@@ -1,5 +1,6 @@
 package com.worxbend.zephyr
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,7 +35,10 @@ import com.worxbend.zephyr.viewmodel.ZephyrUiState
 import com.worxbend.zephyr.viewmodel.ZephyrViewModel
 
 @Composable
-fun App(viewModel: ZephyrViewModel, settingsStore: AppSettingsStore) {
+fun App(
+    viewModel: ZephyrViewModel,
+    settingsStore: AppSettingsStore,
+) {
     val state by viewModel.state.collectAsState()
     val settings by settingsStore.state.collectAsState()
     val settingsSaveStatus by settingsStore.saveStatus.collectAsState()
@@ -45,11 +48,12 @@ fun App(viewModel: ZephyrViewModel, settingsStore: AppSettingsStore) {
         systemDarkTheme = isSystemDarkMode()
         systemReducedMotion = isSystemReducedMotion()
     }
-    val darkTheme = when (settings.themePreference) {
-        ThemePreference.System -> systemDarkTheme
-        ThemePreference.Light -> false
-        ThemePreference.Dark -> true
-    }
+    val darkTheme =
+        when (settings.themePreference) {
+            ThemePreference.System -> systemDarkTheme
+            ThemePreference.Light -> false
+            ThemePreference.Dark -> true
+        }
 
     ZephyrTheme(
         darkTheme = darkTheme,
@@ -59,22 +63,30 @@ fun App(viewModel: ZephyrViewModel, settingsStore: AppSettingsStore) {
     ) {
         Surface(Modifier.fillMaxSize()) {
             when (val current = state) {
-                ZephyrUiState.Loading -> LoadingScreen()
-                is ZephyrUiState.SdkmanMissing -> SdkmanMissingScreen(current.message, viewModel::refreshAll)
-                is ZephyrUiState.Ready -> ZephyrScreen(
-                    state = current,
-                    viewModel = viewModel,
-                    settings = settings,
-                    onSettingsChange = settingsStore::update,
-                    settingsSaveStatus = settingsSaveStatus,
-                    onRetrySettingsSave = settingsStore::retry,
-                    darkTheme = darkTheme,
-                    onToggleTheme = {
-                        settingsStore.update {
-                            it.copy(themePreference = if (darkTheme) ThemePreference.Light else ThemePreference.Dark)
-                        }
-                    },
-                )
+                ZephyrUiState.Loading -> {
+                    LoadingScreen()
+                }
+
+                is ZephyrUiState.SdkmanMissing -> {
+                    SdkmanMissingScreen(current.message, viewModel::refreshAll)
+                }
+
+                is ZephyrUiState.Ready -> {
+                    ZephyrScreen(
+                        state = current,
+                        viewModel = viewModel,
+                        settings = settings,
+                        onSettingsChange = settingsStore::update,
+                        settingsSaveStatus = settingsSaveStatus,
+                        onRetrySettingsSave = settingsStore::retry,
+                        darkTheme = darkTheme,
+                        onToggleTheme = {
+                            settingsStore.update {
+                                it.copy(themePreference = if (darkTheme) ThemePreference.Light else ThemePreference.Dark)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -101,7 +113,10 @@ private fun LoadingScreen() {
 }
 
 @Composable
-private fun SdkmanMissingScreen(message: String, onRetry: () -> Unit) {
+private fun SdkmanMissingScreen(
+    message: String,
+    onRetry: () -> Unit,
+) {
     Column(
         Modifier.fillMaxSize().safeContentPadding().padding(48.dp),
         verticalArrangement = Arrangement.Center,
@@ -154,8 +169,7 @@ internal fun jdkSubtitle(state: ZephyrUiState.Ready): String {
     return default?.let { "Default JDK: $it" } ?: "No JDK Installed"
 }
 
-internal fun sdkmanVersionLabel(state: ZephyrUiState.Ready): String =
-    state.sdkmanStatus.cliVersion ?: "SDKMAN version unknown"
+internal fun sdkmanVersionLabel(state: ZephyrUiState.Ready): String = state.sdkmanStatus.cliVersion ?: "SDKMAN version unknown"
 
 internal fun selfUpdateShortLabel(status: SdkmanSelfUpdateStatus): String =
     when (status) {

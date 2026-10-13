@@ -1,6 +1,8 @@
 package com.worxbend.zephyr.domain
 
-enum class SdkmanCommandAction(val label: String) {
+enum class SdkmanCommandAction(
+    val label: String,
+) {
     Install("Install"),
     Uninstall("Uninstall"),
     SetDefault("Set default"),
@@ -19,6 +21,7 @@ data class PlannedSdkmanCommand(
             SdkmanCommandAction.Uninstall,
             SdkmanCommandAction.SetDefault,
             -> requireValidTarget(requireNotNull(candidate), requireNotNull(version))
+
             SdkmanCommandAction.UpdateMetadata,
             SdkmanCommandAction.SelfUpdate,
             -> require(candidate == null && version == null) { "This command does not accept a candidate or version." }
@@ -62,9 +65,10 @@ sealed interface SdkmanTransaction {
             "Zephyr will install the selected SDKMAN targets sequentially and report each result independently."
         override val confirmationLabel = "Install selected"
         override val destructive = false
-        override val commands = targets.map {
-            PlannedSdkmanCommand(SdkmanCommandAction.Install, it.candidate, it.version)
-        }
+        override val commands =
+            targets.map {
+                PlannedSdkmanCommand(SdkmanCommandAction.Install, it.candidate, it.version)
+            }
     }
 
     data class SnapshotRestore(
@@ -72,9 +76,11 @@ sealed interface SdkmanTransaction {
     ) : SdkmanTransaction {
         init {
             require(commands.isNotEmpty()) { "A snapshot restore requires at least one step." }
-            require(commands.all {
-                it.action == SdkmanCommandAction.Install || it.action == SdkmanCommandAction.SetDefault
-            }) { "Snapshot restore supports only install and default steps." }
+            require(
+                commands.all {
+                    it.action == SdkmanCommandAction.Install || it.action == SdkmanCommandAction.SetDefault
+                },
+            ) { "Snapshot restore supports only install and default steps." }
             commands.forEach {
                 requireValidTarget(
                     requireNotNull(it.candidate) { "Snapshot restore candidate is required." },
@@ -98,9 +104,11 @@ sealed interface SdkmanTransaction {
         init {
             require(profileName.isNotBlank()) { "A toolchain activation requires a profile name." }
             require(commands.isNotEmpty()) { "A toolchain activation requires at least one step." }
-            require(commands.all {
-                it.action == SdkmanCommandAction.Install || it.action == SdkmanCommandAction.SetDefault
-            }) { "Toolchain activation supports only install and default steps." }
+            require(
+                commands.all {
+                    it.action == SdkmanCommandAction.Install || it.action == SdkmanCommandAction.SetDefault
+                },
+            ) { "Toolchain activation supports only install and default steps." }
             commands.forEach {
                 requireValidTarget(
                     requireNotNull(it.candidate) { "Toolchain activation candidate is required." },
@@ -134,11 +142,12 @@ sealed interface SdkmanTransaction {
         }
 
         override val title = "Activate ${targets.size} stable update(s)?"
-        override val description = if (targets.any(UpdateActivationTarget::requiresInstall)) {
-            "Zephyr will install missing stable targets first, then make every selected target the persisted SDKMAN default."
-        } else {
-            "Zephyr will make every selected installed stable target the persisted SDKMAN default. No download is required."
-        }
+        override val description =
+            if (targets.any(UpdateActivationTarget::requiresInstall)) {
+                "Zephyr will install missing stable targets first, then make every selected target the persisted SDKMAN default."
+            } else {
+                "Zephyr will make every selected installed stable target the persisted SDKMAN default. No download is required."
+            }
         override val confirmationLabel =
             if (targets.any(UpdateActivationTarget::requiresInstall)) "Install and activate" else "Activate selected"
         override val destructive = false
@@ -161,7 +170,9 @@ sealed interface SdkmanTransaction {
         }
 
         override val title = "Uninstall $version?"
-        override val description = "SDKMAN will remove $version from ${displayNameFor(candidate)}. Reinstalling it may require another download."
+        override val description = "SDKMAN will remove $version from ${displayNameFor(
+            candidate,
+        )}. Reinstalling it may require another download."
         override val confirmationLabel = "Uninstall"
         override val destructive = true
         override val commands = listOf(PlannedSdkmanCommand(SdkmanCommandAction.Uninstall, candidate, version))
@@ -181,9 +192,10 @@ sealed interface SdkmanTransaction {
             "Zephyr will remove the selected non-default, unprotected versions sequentially and report every result."
         override val confirmationLabel = "Uninstall selected"
         override val destructive = true
-        override val commands = targets.map {
-            PlannedSdkmanCommand(SdkmanCommandAction.Uninstall, it.candidate, it.version)
-        }
+        override val commands =
+            targets.map {
+                PlannedSdkmanCommand(SdkmanCommandAction.Uninstall, it.candidate, it.version)
+            }
     }
 
     data class SetDefault(
@@ -218,9 +230,10 @@ sealed interface SdkmanTransaction {
                 "If every installed version is removed, the package may disappear from Installed."
         override val confirmationLabel = "Clean"
         override val destructive = true
-        override val commands = versions.map {
-            PlannedSdkmanCommand(SdkmanCommandAction.Uninstall, candidate, it)
-        }
+        override val commands =
+            versions.map {
+                PlannedSdkmanCommand(SdkmanCommandAction.Uninstall, candidate, it)
+            }
     }
 
     data object RefreshMetadata : SdkmanTransaction {
@@ -256,7 +269,10 @@ data class UninstallTarget(
     val version: String,
 )
 
-private fun requireValidTarget(candidate: String, version: String) {
+private fun requireValidTarget(
+    candidate: String,
+    version: String,
+) {
     require(isValidSdkmanCandidateName(candidate)) { "Invalid SDKMAN candidate name." }
     require(isValidSdkmanVersion(version)) { "Invalid SDKMAN version identifier." }
 }

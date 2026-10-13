@@ -1,12 +1,12 @@
 package com.worxbend.zephyr.sdkman
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import com.worxbend.zephyr.domain.ConnectivityDiagnostic
 import com.worxbend.zephyr.domain.ConnectivityOutcome
 import com.worxbend.zephyr.domain.ConnectivityRouteKind
 import com.worxbend.zephyr.domain.boundedConnectivityLatencyMillis
 import com.worxbend.zephyr.logging.ZephyrLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okio.Path
 import kotlin.time.Duration
 
@@ -14,16 +14,19 @@ class ApacheCommonsSdkmanCommandRunner(
     private val sdkmanHome: Path,
     private val proxyEnvironment: () -> Map<String, String> = ::emptyMap,
 ) : SdkmanCommandRunner {
-    override suspend fun run(command: SdkmanCommand, timeout: Duration): SdkmanCommandResult =
-        execute(command, timeout, sanitizedEnvironment())
+    override suspend fun run(
+        command: SdkmanCommand,
+        timeout: Duration,
+    ): SdkmanCommandResult = execute(command, timeout, sanitizedEnvironment())
 
     override suspend fun diagnoseConnectivity(timeout: Duration): ConnectivityDiagnostic {
         val environment = sanitizedEnvironment()
-        val route = if (!environment[CANONICAL_HTTPS_PROXY].isNullOrBlank()) {
-            ConnectivityRouteKind.Proxy
-        } else {
-            ConnectivityRouteKind.Direct
-        }
+        val route =
+            if (!environment[CANONICAL_HTTPS_PROXY].isNullOrBlank()) {
+                ConnectivityRouteKind.Proxy
+            } else {
+                ConnectivityRouteKind.Direct
+            }
         val startedAtNanos = System.nanoTime()
         val result = execute(SdkmanCommand.ConnectivityProbe(route), timeout, environment)
         val latencyMillis = boundedConnectivityLatencyMillis((System.nanoTime() - startedAtNanos) / NANOS_PER_MILLISECOND)
@@ -39,20 +42,23 @@ class ApacheCommonsSdkmanCommandRunner(
         command: SdkmanCommand,
         timeout: Duration,
         environment: Map<String, String>,
-    ): SdkmanCommandResult = withContext(Dispatchers.IO) {
-        val result = SdkmanProcessSession().execute(
-            listOf(BASH_PATH, "--noprofile", "--norc", "-c", shellCommand(command)),
-            environment,
-            timeout,
-        ).let { it.copy(stdout = it.stdout.stripAnsi(), stderr = it.stderr.stripAnsi()) }
-        if (result.timedOut) {
-            ZephyrLogger.warn("SDKMAN command timed out: $command")
-        } else if (!result.success) {
-            // Output can contain private paths or proxy details. Log status only.
-            ZephyrLogger.warn("SDKMAN command exited with ${result.exitCode}.")
+    ): SdkmanCommandResult =
+        withContext(Dispatchers.IO) {
+            val result =
+                SdkmanProcessSession()
+                    .execute(
+                        listOf(BASH_PATH, "--noprofile", "--norc", "-c", shellCommand(command)),
+                        environment,
+                        timeout,
+                    ).let { it.copy(stdout = it.stdout.stripAnsi(), stderr = it.stderr.stripAnsi()) }
+            if (result.timedOut) {
+                ZephyrLogger.warn("SDKMAN command timed out: $command")
+            } else if (!result.success) {
+                // Output can contain private paths or proxy details. Log status only.
+                ZephyrLogger.warn("SDKMAN command exited with ${result.exitCode}.")
+            }
+            result
         }
-        result
-    }
 
     private fun sanitizedEnvironment(): Map<String, String> {
         val environment = System.getenv().toMutableMap()
@@ -81,29 +87,59 @@ class ApacheCommonsSdkmanCommandRunner(
 
     private fun shellCommand(command: SdkmanCommand): String {
         val sdkmanInit = sdkmanHome / "bin" / "sdkman-init.sh"
-        val invocation = if (command is SdkmanCommand.ConnectivityProbe) {
-            command.arguments()
-        } else {
-            "sdk ${command.arguments()}"
-        }
+        val invocation =
+            if (command is SdkmanCommand.ConnectivityProbe) {
+                command.arguments()
+            } else {
+                "sdk ${command.arguments()}"
+            }
         return "source ${sdkmanInit.toString().shellQuote()} && $invocation"
     }
 
     private fun SdkmanCommand.arguments(): String =
         when (this) {
-            SdkmanCommand.Version -> "version"
-            SdkmanCommand.ListCandidates -> "list"
-            SdkmanCommand.UpdateCandidateMetadata -> "update"
-            SdkmanCommand.SelfUpdate -> "selfupdate"
-            is SdkmanCommand.ListVersions -> "list ${candidate.shellQuote()}"
-            is SdkmanCommand.Install -> "install ${candidate.shellQuote()} ${version.shellQuote()}"
-            is SdkmanCommand.Uninstall -> "uninstall ${candidate.shellQuote()} ${version.shellQuote()}"
-            is SdkmanCommand.SetDefault -> "default ${candidate.shellQuote()} ${version.shellQuote()}"
-            is SdkmanCommand.ConnectivityProbe -> when (route) {
-                ConnectivityRouteKind.Direct ->
-                    "curl --disable --silent --show-error --output /dev/null --write-out '%{http_code}' --proxy '' --noproxy '*' ${SDKMAN_HEALTH_URL.shellQuote()}"
-                ConnectivityRouteKind.Proxy ->
-                    "curl --disable --silent --show-error --output /dev/null --write-out '%{http_code}' --noproxy '' ${SDKMAN_HEALTH_URL.shellQuote()}"
+            SdkmanCommand.Version -> {
+                "version"
+            }
+
+            SdkmanCommand.ListCandidates -> {
+                "list"
+            }
+
+            SdkmanCommand.UpdateCandidateMetadata -> {
+                "update"
+            }
+
+            SdkmanCommand.SelfUpdate -> {
+                "selfupdate"
+            }
+
+            is SdkmanCommand.ListVersions -> {
+                "list ${candidate.shellQuote()}"
+            }
+
+            is SdkmanCommand.Install -> {
+                "install ${candidate.shellQuote()} ${version.shellQuote()}"
+            }
+
+            is SdkmanCommand.Uninstall -> {
+                "uninstall ${candidate.shellQuote()} ${version.shellQuote()}"
+            }
+
+            is SdkmanCommand.SetDefault -> {
+                "default ${candidate.shellQuote()} ${version.shellQuote()}"
+            }
+
+            is SdkmanCommand.ConnectivityProbe -> {
+                when (route) {
+                    ConnectivityRouteKind.Direct -> {
+                        "curl --disable --silent --show-error --output /dev/null --write-out '%{http_code}' --proxy '' --noproxy '*' ${SDKMAN_HEALTH_URL.shellQuote()}"
+                    }
+
+                    ConnectivityRouteKind.Proxy -> {
+                        "curl --disable --silent --show-error --output /dev/null --write-out '%{http_code}' --noproxy '' ${SDKMAN_HEALTH_URL.shellQuote()}"
+                    }
+                }
             }
         }
 }
@@ -114,21 +150,32 @@ private fun preferredProxy(environment: Map<String, String>): String? =
     }
 
 internal fun classifyConnectivity(result: SdkmanCommandResult): ConnectivityOutcome {
-    val httpCode = result.stdout.trim().takeLast(3).toIntOrNull()
+    val httpCode =
+        result.stdout
+            .trim()
+            .takeLast(3)
+            .toIntOrNull()
     val normalized = result.output.lowercase()
     return when {
         result.timedOut -> ConnectivityOutcome.Timeout
+
         httpCode == 407 ||
             "proxy authentication required" in normalized ||
             "proxy auth" in normalized -> ConnectivityOutcome.ProxyAuthentication
+
         result.exitCode in TLS_CURL_EXIT_CODES ||
             listOf("certificate", "ssl", "tls").any { it in normalized } -> ConnectivityOutcome.Tls
+
         result.exitCode == CURL_TIMEOUT_EXIT_CODE ||
             "timed out" in normalized ||
             "timeout" in normalized -> ConnectivityOutcome.Timeout
+
         httpCode != null && httpCode in 200..399 -> ConnectivityOutcome.Online
+
         httpCode != null && httpCode in 400..599 -> ConnectivityOutcome.Service
+
         result.exitCode in SERVICE_CURL_EXIT_CODES -> ConnectivityOutcome.Service
+
         else -> ConnectivityOutcome.Indeterminate
     }
 }
@@ -150,8 +197,7 @@ fun String.stripAnsi(): String =
     replace(ANSI_OSC_SEQUENCE, "")
         .replace(ANSI_CSI_SEQUENCE, "")
 
-private fun String.shellQuote(): String =
-    "'" + replace("'", "'\"'\"'") + "'"
+private fun String.shellQuote(): String = "'" + replace("'", "'\"'\"'") + "'"
 
 private val ANSI_CSI_SEQUENCE = Regex("\u001B\\[[;?0-9]*[ -/]*[@-~]")
 private val ANSI_OSC_SEQUENCE = Regex("\u001B\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)")

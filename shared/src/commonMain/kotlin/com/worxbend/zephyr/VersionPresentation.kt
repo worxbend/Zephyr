@@ -9,5 +9,4 @@ internal fun statusText(version: CandidateVersion): String =
         add(version.remoteAvailability.label)
     }.joinToString(" - ")
 
-internal fun List<CandidateVersion>.updateTargets(): List<CandidateVersion> =
-    filter { it.isRemoteAvailable && !it.isInstalled }
+internal fun List<CandidateVersion>.updateTargets(): List<CandidateVersion> = filter { it.isRemoteAvailable && !it.isInstalled }

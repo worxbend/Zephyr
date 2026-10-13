@@ -7,7 +7,9 @@ enum class DiskImpactKind {
     Unknown,
 }
 
-enum class EstimateConfidence(val label: String) {
+enum class EstimateConfidence(
+    val label: String,
+) {
     Exact("Exact"),
     Estimated("Estimated"),
     Unknown("Unknown"),
@@ -35,9 +37,12 @@ fun formatByteSize(bytes: Long): String {
         value /= 1_024
         unit += 1
     }
-    val rounded = if (value >= 100) value.toLong().toString() else {
-        val tenths = (value * 10).toLong()
-        "${tenths / 10}.${tenths % 10}"
-    }
+    val rounded =
+        if (value >= 100) {
+            value.toLong().toString()
+        } else {
+            val tenths = (value * 10).toLong()
+            "${tenths / 10}.${tenths % 10}"
+        }
     return "$rounded ${units[unit]}"
 }

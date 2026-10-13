@@ -38,21 +38,30 @@ class ProjectWorkspacesPresenter(
         val request = ++generation
         refreshJob?.cancel()
         mutableState.update { it.copy(loading = true) }
-        refreshJob = scope.launch {
-            val documents = mutableMapOf<String, ProjectWorkspaceDocument>()
-            val errors = mutableMapOf<String, String>()
-            try {
-                references.forEach { reference ->
-                    try { documents[reference.sdkmanRcPath] = service.readWorkspace(reference) }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    catch (failure: Exception) { errors[reference.sdkmanRcPath] = failure.message ?: "The project .sdkmanrc could not be read safely." }
+        refreshJob =
+            scope.launch {
+                val documents = mutableMapOf<String, ProjectWorkspaceDocument>()
+                val errors = mutableMapOf<String, String>()
+                try {
+                    references.forEach { reference ->
+                        try {
+                            documents[reference.sdkmanRcPath] = service.readWorkspace(reference)
+                        } catch (
+                            cancelled: CancellationException,
+                        ) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            errors[reference.sdkmanRcPath] =
+                                failure.message ?: "The project .sdkmanrc could not be read safely."
+                        }
+                    }
+                    if (request == generation) mutableState.update { it.copy(documents = documents.toMap(), errors = errors.toMap()) }
+                } finally {
+                    if (request == generation) mutableState.update { it.copy(loading = false) }
                 }
-                if (request == generation) mutableState.update { it.copy(documents = documents.toMap(), errors = errors.toMap()) }
-            } finally {
-                if (request == generation) mutableState.update { it.copy(loading = false) }
             }
-        }
     }
+
     fun pin(onSettingsChange: ((AppSettings) -> AppSettings) -> Unit) {
         if (state.value.pinning || state.value.loading) return
         mutableState.update { it.copy(pinning = true) }
@@ -60,27 +69,65 @@ class ProjectWorkspacesPresenter(
             try {
                 service.chooseWorkspace()?.let { selected ->
                     onSettingsChange {
-                        it.copy(projectWorkspaces = (it.projectWorkspaces.filterNot { existing -> existing.sdkmanRcPath == selected.reference.sdkmanRcPath } + selected.reference).sortedBy { reference -> reference.displayName.lowercase() })
+                        it.copy(
+                            projectWorkspaces =
+                                (
+                                    it.projectWorkspaces.filterNot { existing ->
+                                        existing.sdkmanRcPath ==
+                                            selected.reference.sdkmanRcPath
+                                    } +
+                                        selected.reference
+                                ).sortedBy { reference -> reference.displayName.lowercase() },
+                        )
                     }
-                    mutableState.update { it.copy(documents = it.documents + (selected.reference.sdkmanRcPath to selected), errors = it.errors - selected.reference.sdkmanRcPath) }
+                    mutableState.update {
+                        it.copy(
+                            documents = it.documents + (selected.reference.sdkmanRcPath to selected),
+                            errors =
+                                it.errors - selected.reference.sdkmanRcPath,
+                        )
+                    }
                 }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) {
-                mutableState.update { it.copy(launchMessages = it.launchMessages + (PIN_WORKSPACE_MESSAGE_KEY to (failure.message ?: "Unable to pin the selected .sdkmanrc."))) }
-            } finally { mutableState.update { it.copy(pinning = false) } }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                mutableState.update {
+                    it.copy(
+                        launchMessages =
+                            it.launchMessages + (PIN_WORKSPACE_MESSAGE_KEY to (failure.message ?: "Unable to pin the selected .sdkmanrc.")),
+                    )
+                }
+            } finally {
+                mutableState.update { it.copy(pinning = false) }
+            }
         }
     }
-    fun launch(sdkmanHome: String, workspace: ProjectWorkspaceDocument) {
+
+    fun launch(
+        sdkmanHome: String,
+        workspace: ProjectWorkspaceDocument,
+    ) {
         scope.launch {
             try {
                 val result = terminal.launchWorkspace(sdkmanHome, workspace.projectDirectory, workspace.targets)
                 mutableState.update { it.copy(launchMessages = it.launchMessages + (workspace.reference.sdkmanRcPath to result.message)) }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) {
-                mutableState.update { it.copy(launchMessages = it.launchMessages + (workspace.reference.sdkmanRcPath to (failure.message ?: "Unable to open scoped terminal."))) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                mutableState.update {
+                    it.copy(
+                        launchMessages =
+                            it.launchMessages +
+                                (workspace.reference.sdkmanRcPath to (failure.message ?: "Unable to open scoped terminal.")),
+                    )
+                }
             }
         }
     }
+
     fun close() = scope.cancel()
-    companion object { const val PIN_WORKSPACE_MESSAGE_KEY = "<pin-workspace>" }
+
+    companion object {
+        const val PIN_WORKSPACE_MESSAGE_KEY = "<pin-workspace>"
+    }
 }

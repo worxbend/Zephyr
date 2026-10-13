@@ -12,12 +12,13 @@ import kotlin.test.assertFalse
 class DesiredStateTest {
     @Test
     fun profileBaselineStoresOnlyValidatedToolIdentifiers() {
-        val desired = desiredStateFromProfile(
-            ToolchainProfile(
-                "Backend\nteam",
-                listOf(InstallTarget("java", "21-tem"), InstallTarget("gradle", "9.0")),
-            ),
-        )
+        val desired =
+            desiredStateFromProfile(
+                ToolchainProfile(
+                    "Backend\nteam",
+                    listOf(InstallTarget("java", "21-tem"), InstallTarget("gradle", "9.0")),
+                ),
+            )
 
         assertEquals(DesiredStateSourceKind.Profile, desired.sourceKind)
         assertEquals("Backend team", desired.sourceLabel)
@@ -27,14 +28,16 @@ class DesiredStateTest {
 
     @Test
     fun snapshotBaselineUsesCapturedIdentifiersAndTimestampNotSourcePath() {
-        val desired = desiredStateFromSnapshot(
-            EnvironmentSnapshot(
-                capturedAtEpochMillis = 1234,
-                candidates = listOf(
-                    SnapshotCandidate("java", "21-tem", listOf("17-tem", "21-tem")),
+        val desired =
+            desiredStateFromSnapshot(
+                EnvironmentSnapshot(
+                    capturedAtEpochMillis = 1234,
+                    candidates =
+                        listOf(
+                            SnapshotCandidate("java", "21-tem", listOf("17-tem", "21-tem")),
+                        ),
                 ),
-            ),
-        )
+            )
 
         assertEquals(DesiredStateSourceKind.Snapshot, desired.sourceKind)
         assertEquals("Snapshot 1234", desired.sourceLabel)

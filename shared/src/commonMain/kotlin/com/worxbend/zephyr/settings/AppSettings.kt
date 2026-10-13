@@ -1,8 +1,8 @@
 package com.worxbend.zephyr.settings
 
+import com.worxbend.zephyr.domain.DesiredToolchainState
 import com.worxbend.zephyr.domain.InstallTarget
 import com.worxbend.zephyr.domain.ProtectedVersion
-import com.worxbend.zephyr.domain.DesiredToolchainState
 
 data class AppSettings(
     val themePreference: ThemePreference = ThemePreference.System,
@@ -54,12 +54,14 @@ fun AppSettings.reconcileLocalOnlyObservations(
     val existing = localOnlyObservations.associateBy { it.candidate to it.version }
     // An empty or failed audit is not evidence of removal. Replace only verified candidates.
     val preserved = localOnlyObservations.filter { it.candidate !in verifiedCandidates }
-    val observed = current.map { target ->
-        existing[target.candidate to target.version]
-            ?: LocalOnlyObservation(target.candidate, target.version, nowEpochMillis)
-    }
-    val next = (preserved + observed)
-        .sortedWith(compareBy(LocalOnlyObservation::candidate, LocalOnlyObservation::version))
+    val observed =
+        current.map { target ->
+            existing[target.candidate to target.version]
+                ?: LocalOnlyObservation(target.candidate, target.version, nowEpochMillis)
+        }
+    val next =
+        (preserved + observed)
+            .sortedWith(compareBy(LocalOnlyObservation::candidate, LocalOnlyObservation::version))
     return if (next == localOnlyObservations) this else copy(localOnlyObservations = next)
 }
 
@@ -75,8 +77,7 @@ fun AppSettings.reviewDueLocalOnly(nowEpochMillis: Long): Set<ProtectedVersion> 
 const val MIN_NAVIGATION_WIDTH_DP = 190
 const val MAX_NAVIGATION_WIDTH_DP = 360
 
-fun Int.normalizedNavigationWidth(): Int =
-    if (this == 0) 0 else coerceIn(MIN_NAVIGATION_WIDTH_DP, MAX_NAVIGATION_WIDTH_DP)
+fun Int.normalizedNavigationWidth(): Int = if (this == 0) 0 else coerceIn(MIN_NAVIGATION_WIDTH_DP, MAX_NAVIGATION_WIDTH_DP)
 
 data class ToolchainProfile(
     val name: String,
@@ -97,28 +98,39 @@ data class ProjectWorkspaceReference(
     }
 }
 
-fun AppSettings.recordRecentCandidate(candidate: String, limit: Int = 6): AppSettings {
+fun AppSettings.recordRecentCandidate(
+    candidate: String,
+    limit: Int = 6,
+): AppSettings {
     val normalized = candidate.trim()
     if (normalized.isEmpty()) return this
     return copy(
-        recentCandidates = (listOf(normalized) + recentCandidates)
-            .distinct()
-            .take(limit.coerceAtLeast(1)),
+        recentCandidates =
+            (listOf(normalized) + recentCandidates)
+                .distinct()
+                .take(limit.coerceAtLeast(1)),
     )
 }
 
-enum class ThemePreference(val label: String) {
+enum class ThemePreference(
+    val label: String,
+) {
     System("System"),
     Light("Light"),
     Dark("Dark"),
 }
 
-enum class UiDensity(val label: String) {
+enum class UiDensity(
+    val label: String,
+) {
     Compact("Compact"),
     Comfortable("Comfortable"),
 }
 
-enum class TextScale(val label: String, val factor: Float) {
+enum class TextScale(
+    val label: String,
+    val factor: Float,
+) {
     Percent100("100%", 1f),
     Percent125("125%", 1.25f),
     Percent150("150%", 1.5f),
@@ -126,7 +138,9 @@ enum class TextScale(val label: String, val factor: Float) {
     Percent200("200%", 2f),
 }
 
-enum class MotionPreference(val label: String) {
+enum class MotionPreference(
+    val label: String,
+) {
     System("System"),
     Full("Full"),
     Reduced("Reduced"),
@@ -149,13 +163,17 @@ enum class MetadataRefreshSchedule(
     Daily("Daily", 24L * 60L * 60L * 1_000L),
 }
 
-enum class UpdateNotificationPolicy(val label: String) {
+enum class UpdateNotificationPolicy(
+    val label: String,
+) {
     Off("Off"),
     UpdatesOnly("Updates only"),
     AllChecks("All checks"),
 }
 
-enum class OperationNotificationPolicy(val label: String) {
+enum class OperationNotificationPolicy(
+    val label: String,
+) {
     Off("Off"),
     LongRunning("Long operations"),
     AllCompletions("All completions"),
@@ -171,7 +189,9 @@ enum class CleanupGracePeriod(
     NinetyDays("90 days", 90L * 24L * 60L * 60L * 1_000L),
 }
 
-enum class CollectionViewMode(val label: String) {
+enum class CollectionViewMode(
+    val label: String,
+) {
     Cards("Cards"),
     Table("Table"),
 }

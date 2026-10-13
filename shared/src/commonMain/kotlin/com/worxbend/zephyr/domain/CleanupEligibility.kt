@@ -23,13 +23,14 @@ fun cleanupEligibility(
     val installedByVersion = candidate.installedVersions.associateBy(CandidateVersion::version)
     for (version in candidate.localOnlyVersions.distinct()) {
         val installed = installedByVersion[version]
-        val reason = when {
-            !evidenceTrusted || candidate.remoteEvidence != RemoteEvidenceState.LiveComplete -> CleanupBlockReason.Unverified
-            version == candidate.defaultVersion || installed?.isDefault == true -> CleanupBlockReason.Default
-            ProtectedVersion(candidate.name, version) in protectedVersions -> CleanupBlockReason.Protected
-            installed?.isInstalled != true || !installed.isConfirmedLocalOnly -> CleanupBlockReason.NotInstalledLocalOnly
-            else -> null
-        }
+        val reason =
+            when {
+                !evidenceTrusted || candidate.remoteEvidence != RemoteEvidenceState.LiveComplete -> CleanupBlockReason.Unverified
+                version == candidate.defaultVersion || installed?.isDefault == true -> CleanupBlockReason.Default
+                ProtectedVersion(candidate.name, version) in protectedVersions -> CleanupBlockReason.Protected
+                installed?.isInstalled != true || !installed.isConfirmedLocalOnly -> CleanupBlockReason.NotInstalledLocalOnly
+                else -> null
+            }
         if (reason == null) eligible += version else blocked[version] = reason
     }
     return CleanupEligibility(eligible.toList(), blocked.toMap())

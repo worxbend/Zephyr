@@ -62,10 +62,11 @@ internal fun GlobalSearchDialog(
     onSelect: (GlobalSearchTarget) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val index = remember(state.candidates, state.catalog, mode) {
-        val allItems = buildGlobalSearchIndex(state.candidates, state.catalog)
-        if (mode == SearchOverlayMode.CommandPalette) commandPaletteItems(allItems) else allItems
-    }
+    val index =
+        remember(state.candidates, state.catalog, mode) {
+            val allItems = buildGlobalSearchIndex(state.candidates, state.catalog)
+            if (mode == SearchOverlayMode.CommandPalette) commandPaletteItems(allItems) else allItems
+        }
     val results = remember(index, query) { searchGlobalIndex(index, query) }
     var selectedIndex by remember(query) { mutableIntStateOf(0) }
     val focusRequester = remember { FocusRequester() }
@@ -94,34 +95,45 @@ internal fun GlobalSearchDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.padding(16.dp).widthIn(max = 760.dp).fillMaxWidth().heightIn(max = 560.dp)
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) {
-                        false
-                    } else {
-                        when (event.key) {
-                            Key.DirectionDown -> {
-                                if (results.isNotEmpty()) {
-                                    selectedIndex = (selectedIndex + 1).coerceAtMost(results.lastIndex)
+            modifier =
+                Modifier
+                    .padding(16.dp)
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) {
+                            false
+                        } else {
+                            when (event.key) {
+                                Key.DirectionDown -> {
+                                    if (results.isNotEmpty()) {
+                                        selectedIndex = (selectedIndex + 1).coerceAtMost(results.lastIndex)
+                                    }
+                                    true
                                 }
-                                true
+
+                                Key.DirectionUp -> {
+                                    selectedIndex = (selectedIndex - 1).coerceAtLeast(0)
+                                    true
+                                }
+
+                                Key.Enter -> {
+                                    results.getOrNull(selectedIndex)?.let { onSelect(it.target) }
+                                    true
+                                }
+
+                                Key.Escape -> {
+                                    onDismiss()
+                                    true
+                                }
+
+                                else -> {
+                                    false
+                                }
                             }
-                            Key.DirectionUp -> {
-                                selectedIndex = (selectedIndex - 1).coerceAtLeast(0)
-                                true
-                            }
-                            Key.Enter -> {
-                                results.getOrNull(selectedIndex)?.let { onSelect(it.target) }
-                                true
-                            }
-                            Key.Escape -> {
-                                onDismiss()
-                                true
-                            }
-                            else -> false
                         }
-                    }
-                },
+                    },
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
@@ -149,11 +161,12 @@ internal fun GlobalSearchDialog(
                 SearchField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = if (mode == SearchOverlayMode.CommandPalette) {
-                        "Search commands and destinations"
-                    } else {
-                        "Candidates, versions, settings, and actions"
-                    },
+                    placeholder =
+                        if (mode == SearchOverlayMode.CommandPalette) {
+                            "Search commands and destinations"
+                        } else {
+                            "Candidates, versions, settings, and actions"
+                        },
                     modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 )
                 Text(
@@ -167,9 +180,12 @@ internal fun GlobalSearchDialog(
                 )
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.surface),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .clip(MaterialTheme.shapes.large)
+                            .background(MaterialTheme.colorScheme.surface),
                     contentPadding = PaddingValues(6.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
@@ -228,19 +244,19 @@ private fun GlobalSearchResultRow(
 ) {
     val background = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(background)
-            .border(
-                1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                MaterialTheme.shapes.medium,
-            )
-            .onFocusChanged { if (it.isFocused) onFocus() }
-            .semantics { this.selected = selected }
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(background)
+                .border(
+                    1.dp,
+                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    MaterialTheme.shapes.medium,
+                ).onFocusChanged { if (it.isFocused) onFocus() }
+                .semantics { this.selected = selected }
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

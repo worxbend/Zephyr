@@ -69,29 +69,37 @@ internal fun OperationHistoryScreen(
             )
         }
         when {
-            state.operationJournal.isEmpty() -> EmptyState(
-                title = "No operations yet",
-                text = "Confirmed installs, default changes, removals, and maintenance actions will appear here.",
-                action = "Open Update Center",
-                onAction = { onOpenUpdateCenter() },
-            )
-            entries.isEmpty() -> EmptyState(
-                title = "No matching operations",
-                text = "No journal entries match \"$query\".",
-                action = "Clear search",
-                onAction = { query = "" },
-            )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(metrics.spacing),
-            ) {
-                items(entries, key = { it.id }) { entry ->
-                    OperationJournalCard(
-                        entry = entry,
-                        onRecoveryAction = { action -> onRecovery(entry, action) },
-                        onResume = { onResume(entry.id) },
-                        isLive = entry.id in state.liveOperationIds,
-                    )
+            state.operationJournal.isEmpty() -> {
+                EmptyState(
+                    title = "No operations yet",
+                    text = "Confirmed installs, default changes, removals, and maintenance actions will appear here.",
+                    action = "Open Update Center",
+                    onAction = { onOpenUpdateCenter() },
+                )
+            }
+
+            entries.isEmpty() -> {
+                EmptyState(
+                    title = "No matching operations",
+                    text = "No journal entries match \"$query\".",
+                    action = "Clear search",
+                    onAction = { query = "" },
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(metrics.spacing),
+                ) {
+                    items(entries, key = { it.id }) { entry ->
+                        OperationJournalCard(
+                            entry = entry,
+                            onRecoveryAction = { action -> onRecovery(entry, action) },
+                            onResume = { onResume(entry.id) },
+                            isLive = entry.id in state.liveOperationIds,
+                        )
+                    }
                 }
             }
         }
@@ -108,13 +116,14 @@ internal fun OperationJournalCard(
     val metrics = LocalZephyrMetrics.current
     val canReview = !isLive && entry.status != OperationStatus.Running
     val resumableCommands = entry.resumableCommands()
-    val tone = when (entry.status) {
-        OperationStatus.Running -> StatusTone.Accent
-        OperationStatus.Succeeded -> StatusTone.Success
-        OperationStatus.Failed -> StatusTone.Error
-        OperationStatus.Interrupted -> StatusTone.Warning
-        OperationStatus.Indeterminate -> StatusTone.Warning
-    }
+    val tone =
+        when (entry.status) {
+            OperationStatus.Running -> StatusTone.Accent
+            OperationStatus.Succeeded -> StatusTone.Success
+            OperationStatus.Failed -> StatusTone.Error
+            OperationStatus.Interrupted -> StatusTone.Warning
+            OperationStatus.Indeterminate -> StatusTone.Warning
+        }
     ZephyrPanel(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(metrics.panelPadding),
@@ -167,9 +176,11 @@ internal fun OperationJournalCard(
                         step.status.label,
                         when (step.status) {
                             com.worxbend.zephyr.domain.OperationStepStatus.Succeeded -> BadgeTone.Success
+
                             com.worxbend.zephyr.domain.OperationStepStatus.Failed,
                             com.worxbend.zephyr.domain.OperationStepStatus.Indeterminate,
                             -> BadgeTone.Warning
+
                             else -> BadgeTone.Neutral
                         },
                     )

@@ -1,8 +1,8 @@
 package com.worxbend.zephyr.data
 
+import com.worxbend.zephyr.domain.InstallTarget
 import java.io.File
 import java.nio.file.Files
-import com.worxbend.zephyr.domain.InstallTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,17 +12,19 @@ class JvmTerminalLauncherTest {
     @Test
     fun activationValuesStayOutOfTheShellScript() {
         var started: ProcessBuilder? = null
-        val launcher = JvmTerminalLauncher(
-            terminalCandidates = listOf(File("/bin/true")),
-            bash = File("/bin/true"),
-            processStarter = { started = it },
-        )
+        val launcher =
+            JvmTerminalLauncher(
+                terminalCandidates = listOf(File("/bin/true")),
+                bash = File("/bin/true"),
+                processStarter = { started = it },
+            )
 
-        val result = launcher.launch(
-            sdkmanHome = "/tmp/sdkman home",
-            candidate = "java",
-            version = "21.0.5-tem",
-        )
+        val result =
+            launcher.launch(
+                sdkmanHome = "/tmp/sdkman home",
+                candidate = "java",
+                version = "21.0.5-tem",
+            )
 
         assertTrue(result.launched)
         val process = requireNotNull(started)
@@ -35,11 +37,12 @@ class JvmTerminalLauncherTest {
     @Test
     fun rejectsControlCharactersBeforeStartingAProcess() {
         var started = false
-        val launcher = JvmTerminalLauncher(
-            terminalCandidates = listOf(File("/bin/true")),
-            bash = File("/bin/true"),
-            processStarter = { started = true },
-        )
+        val launcher =
+            JvmTerminalLauncher(
+                terminalCandidates = listOf(File("/bin/true")),
+                bash = File("/bin/true"),
+                processStarter = { started = true },
+            )
 
         val result = launcher.launch("/tmp/sdkman", "java\ninvalid", "21")
 
@@ -59,20 +62,23 @@ class JvmTerminalLauncherTest {
         val project = Files.createTempDirectory("zephyr-terminal-project-")
         try {
             var started: ProcessBuilder? = null
-            val launcher = JvmTerminalLauncher(
-                terminalCandidates = listOf(File("/bin/true")),
-                bash = File("/bin/true"),
-                processStarter = { started = it },
-            )
+            val launcher =
+                JvmTerminalLauncher(
+                    terminalCandidates = listOf(File("/bin/true")),
+                    bash = File("/bin/true"),
+                    processStarter = { started = it },
+                )
 
-            val result = launcher.launchWorkspace(
-                sdkmanHome = "/tmp/sdkman home",
-                workingDirectory = project.toString(),
-                targets = listOf(
-                    InstallTarget("java", "21.0.5-tem"),
-                    InstallTarget("gradle", "9.0"),
-                ),
-            )
+            val result =
+                launcher.launchWorkspace(
+                    sdkmanHome = "/tmp/sdkman home",
+                    workingDirectory = project.toString(),
+                    targets =
+                        listOf(
+                            InstallTarget("java", "21.0.5-tem"),
+                            InstallTarget("gradle", "9.0"),
+                        ),
+                )
 
             assertTrue(result.launched)
             val process = requireNotNull(started)
@@ -99,17 +105,19 @@ class JvmTerminalLauncherTest {
             val link = root.resolve("linked-project")
             Files.createSymbolicLink(link, project)
             var started = false
-            val launcher = JvmTerminalLauncher(
-                terminalCandidates = listOf(File("/bin/true")),
-                bash = File("/bin/true"),
-                processStarter = { started = true },
-            )
+            val launcher =
+                JvmTerminalLauncher(
+                    terminalCandidates = listOf(File("/bin/true")),
+                    bash = File("/bin/true"),
+                    processStarter = { started = true },
+                )
 
-            val result = launcher.launchWorkspace(
-                "/tmp/sdkman",
-                link.toString(),
-                listOf(InstallTarget("java", "21-tem")),
-            )
+            val result =
+                launcher.launchWorkspace(
+                    "/tmp/sdkman",
+                    link.toString(),
+                    listOf(InstallTarget("java", "21-tem")),
+                )
 
             assertFalse(result.launched)
             assertFalse(started)

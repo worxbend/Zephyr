@@ -1,14 +1,14 @@
 package com.worxbend.zephyr
 
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Shapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Immutable
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -57,25 +57,40 @@ internal data class ZephyrColors(
 
 internal val LocalZephyrColors = staticCompositionLocalOf { ZephyrLightFeedback }
 
-internal val ZephyrDarkFeedback = ZephyrColors(
-    success = Color(0xFF69DFB1), onSuccess = Color(0xFF9DEBCC), successContainer = Color(0xFF16392F),
-    warning = Color(0xFFF3C675), onWarning = Color(0xFFFFD99B), warningContainer = Color(0xFF44351D),
-    info = Color(0xFF9EBBFF), onInfo = Color(0xFFCDDCFF), infoContainer = Color(0xFF243451),
-)
+internal val ZephyrDarkFeedback =
+    ZephyrColors(
+        success = Color(0xFF69DFB1),
+        onSuccess = Color(0xFF9DEBCC),
+        successContainer = Color(0xFF16392F),
+        warning = Color(0xFFF3C675),
+        onWarning = Color(0xFFFFD99B),
+        warningContainer = Color(0xFF44351D),
+        info = Color(0xFF9EBBFF),
+        onInfo = Color(0xFFCDDCFF),
+        infoContainer = Color(0xFF243451),
+    )
 
-internal val ZephyrLightFeedback = ZephyrColors(
-    success = Color(0xFF126847), onSuccess = Color(0xFF115438), successContainer = Color(0xFFD9F2E6),
-    warning = Color(0xFF815006), onWarning = Color(0xFF70430B), warningContainer = Color(0xFFFFEAC6),
-    info = Color(0xFF2B5299), onInfo = Color(0xFF234782), infoContainer = Color(0xFFE0EAFE),
-)
+internal val ZephyrLightFeedback =
+    ZephyrColors(
+        success = Color(0xFF126847),
+        onSuccess = Color(0xFF115438),
+        successContainer = Color(0xFFD9F2E6),
+        warning = Color(0xFF815006),
+        onWarning = Color(0xFF70430B),
+        warningContainer = Color(0xFFFFEAC6),
+        info = Color(0xFF2B5299),
+        onInfo = Color(0xFF234782),
+        infoContainer = Color(0xFFE0EAFE),
+    )
 
-private val ZephyrShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(20.dp),
-)
+private val ZephyrShapes =
+    Shapes(
+        extraSmall = RoundedCornerShape(6.dp),
+        small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp),
+        large = RoundedCornerShape(16.dp),
+        extraLarge = RoundedCornerShape(20.dp),
+    )
 
 @Composable
 internal fun ZephyrTheme(
@@ -142,111 +157,146 @@ private fun ZephyrMetrics.scaledForText(factor: Float): ZephyrMetrics {
     )
 }
 
-internal val ZephyrLightColors = lightColorScheme(
-    primary = Color(0xFFB33B10),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFCE5DA),
-    onPrimaryContainer = Color(0xFF7C290D),
-    secondary = Color(0xFF77216F),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFF1E4EF),
-    onSecondaryContainer = Color(0xFF5E2750),
-    tertiary = Color(0xFF126847),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFD9F2E6),
-    onTertiaryContainer = Color(0xFF115438),
-    background = Color(0xFFF6F5F4),
-    onBackground = Color(0xFF242424),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF242424),
-    surfaceVariant = Color(0xFFEDECEB),
-    onSurfaceVariant = Color(0xFF595959),
-    outline = Color(0xFF808080),
-    outlineVariant = Color(0xFFD9D8D6),
-    error = Color(0xFFB12643),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFE0E5),
-    onErrorContainer = Color(0xFF891A33),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFFFFFF),
-    surfaceContainer = Color(0xFFF0EFED),
-    surfaceContainerHigh = Color(0xFFE6E5E3),
-    surfaceContainerHighest = Color(0xFFDCDAD7),
-    inverseSurface = Color(0xFF242424),
-    inverseOnSurface = Color(0xFFF6F5F4),
-    inversePrimary = Color(0xFFFFAD85),
-    surfaceTint = Color(0xFFB33B10),
-)
+internal val ZephyrLightColors =
+    lightColorScheme(
+        primary = Color(0xFFB33B10),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFCE5DA),
+        onPrimaryContainer = Color(0xFF7C290D),
+        secondary = Color(0xFF77216F),
+        onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFF1E4EF),
+        onSecondaryContainer = Color(0xFF5E2750),
+        tertiary = Color(0xFF126847),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFD9F2E6),
+        onTertiaryContainer = Color(0xFF115438),
+        background = Color(0xFFF6F5F4),
+        onBackground = Color(0xFF242424),
+        surface = Color(0xFFFFFFFF),
+        onSurface = Color(0xFF242424),
+        surfaceVariant = Color(0xFFEDECEB),
+        onSurfaceVariant = Color(0xFF595959),
+        outline = Color(0xFF808080),
+        outlineVariant = Color(0xFFD9D8D6),
+        error = Color(0xFFB12643),
+        onError = Color(0xFFFFFFFF),
+        errorContainer = Color(0xFFFFE0E5),
+        onErrorContainer = Color(0xFF891A33),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFFFFFFF),
+        surfaceContainer = Color(0xFFF0EFED),
+        surfaceContainerHigh = Color(0xFFE6E5E3),
+        surfaceContainerHighest = Color(0xFFDCDAD7),
+        inverseSurface = Color(0xFF242424),
+        inverseOnSurface = Color(0xFFF6F5F4),
+        inversePrimary = Color(0xFFFFAD85),
+        surfaceTint = Color(0xFFB33B10),
+    )
 
-internal val ZephyrDarkColors = darkColorScheme(
-    primary = Color(0xFFFFAD85),
-    onPrimary = Color(0xFF4D210D),
-    primaryContainer = Color(0xFF573322),
-    onPrimaryContainer = Color(0xFFFFDCC8),
-    secondary = Color(0xFFE5ACDB),
-    onSecondary = Color(0xFF3D1838),
-    secondaryContainer = Color(0xFF493144),
-    onSecondaryContainer = Color(0xFFF7D9EF),
-    tertiary = Color(0xFF69DFB1),
-    onTertiary = Color(0xFF0B3022),
-    tertiaryContainer = Color(0xFF16392F),
-    onTertiaryContainer = Color(0xFF9DEBCC),
-    background = Color(0xFF242424),
-    onBackground = Color(0xFFF6F5F4),
-    surface = Color(0xFF303030),
-    onSurface = Color(0xFFF6F5F4),
-    surfaceVariant = Color(0xFF3D3D3D),
-    onSurfaceVariant = Color(0xFFC6C6C6),
-    outline = Color(0xFF969696),
-    outlineVariant = Color(0xFF484848),
-    error = Color(0xFFFF8DA5),
-    onError = Color(0xFF4A1023),
-    errorContainer = Color(0xFF482334),
-    onErrorContainer = Color(0xFFFFC6D3),
-    surfaceContainerLowest = Color(0xFF1E1E1E),
-    surfaceContainerLow = Color(0xFF303030),
-    surfaceContainer = Color(0xFF363636),
-    surfaceContainerHigh = Color(0xFF424242),
-    surfaceContainerHighest = Color(0xFF4A4A4A),
-    inverseSurface = Color(0xFFF6F5F4),
-    inverseOnSurface = Color(0xFF242424),
-    inversePrimary = Color(0xFFB33B10),
-    surfaceTint = Color(0xFFFFAD85),
-)
+internal val ZephyrDarkColors =
+    darkColorScheme(
+        primary = Color(0xFFFFAD85),
+        onPrimary = Color(0xFF4D210D),
+        primaryContainer = Color(0xFF573322),
+        onPrimaryContainer = Color(0xFFFFDCC8),
+        secondary = Color(0xFFE5ACDB),
+        onSecondary = Color(0xFF3D1838),
+        secondaryContainer = Color(0xFF493144),
+        onSecondaryContainer = Color(0xFFF7D9EF),
+        tertiary = Color(0xFF69DFB1),
+        onTertiary = Color(0xFF0B3022),
+        tertiaryContainer = Color(0xFF16392F),
+        onTertiaryContainer = Color(0xFF9DEBCC),
+        background = Color(0xFF242424),
+        onBackground = Color(0xFFF6F5F4),
+        surface = Color(0xFF303030),
+        onSurface = Color(0xFFF6F5F4),
+        surfaceVariant = Color(0xFF3D3D3D),
+        onSurfaceVariant = Color(0xFFC6C6C6),
+        outline = Color(0xFF969696),
+        outlineVariant = Color(0xFF484848),
+        error = Color(0xFFFF8DA5),
+        onError = Color(0xFF4A1023),
+        errorContainer = Color(0xFF482334),
+        onErrorContainer = Color(0xFFFFC6D3),
+        surfaceContainerLowest = Color(0xFF1E1E1E),
+        surfaceContainerLow = Color(0xFF303030),
+        surfaceContainer = Color(0xFF363636),
+        surfaceContainerHigh = Color(0xFF424242),
+        surfaceContainerHighest = Color(0xFF4A4A4A),
+        inverseSurface = Color(0xFFF6F5F4),
+        inverseOnSurface = Color(0xFF242424),
+        inversePrimary = Color(0xFFB33B10),
+        surfaceTint = Color(0xFFFFAD85),
+    )
 
-private val ZephyrTypography = Typography(
-    displaySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
-    headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
-    headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold),
-    titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 21.sp),
-    bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 13.sp, lineHeight = 19.sp),
-    bodySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, lineHeight = 17.sp),
-    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium),
-    labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium),
-)
+private val ZephyrTypography =
+    Typography(
+        displaySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
+        headlineMedium =
+            TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 24.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        headlineSmall =
+            TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 22.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+        titleLarge =
+            TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 18.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        titleMedium =
+            TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        titleSmall =
+            TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 21.sp),
+        bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 13.sp, lineHeight = 19.sp),
+        bodySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, lineHeight = 17.sp),
+        labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium),
+        labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+        labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium),
+    )
 
-private val CompactMetrics = ZephyrMetrics(
-    navigationWidth = 238.dp,
-    toolbarHeight = 58.dp,
-    statusBarHeight = 30.dp,
-    pagePadding = 24.dp,
-    panelPadding = 18.dp,
-    controlHeight = 36.dp,
-    cornerRadius = 12.dp,
-    spacing = 8.dp,
-)
+private val CompactMetrics =
+    ZephyrMetrics(
+        navigationWidth = 238.dp,
+        toolbarHeight = 58.dp,
+        statusBarHeight = 30.dp,
+        pagePadding = 24.dp,
+        panelPadding = 18.dp,
+        controlHeight = 36.dp,
+        cornerRadius = 12.dp,
+        spacing = 8.dp,
+    )
 
-private val ComfortableMetrics = ZephyrMetrics(
-    navigationWidth = 264.dp,
-    toolbarHeight = 58.dp,
-    statusBarHeight = 30.dp,
-    pagePadding = 28.dp,
-    panelPadding = 18.dp,
-    controlHeight = 42.dp,
-    cornerRadius = 14.dp,
-    spacing = 12.dp,
-)
+private val ComfortableMetrics =
+    ZephyrMetrics(
+        navigationWidth = 264.dp,
+        toolbarHeight = 58.dp,
+        statusBarHeight = 30.dp,
+        pagePadding = 28.dp,
+        panelPadding = 18.dp,
+        controlHeight = 42.dp,
+        cornerRadius = 14.dp,
+        spacing = 12.dp,
+    )

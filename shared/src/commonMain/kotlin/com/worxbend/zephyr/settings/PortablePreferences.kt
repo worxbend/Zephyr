@@ -22,87 +22,94 @@ data class PortablePreferences(
     val savedJdkFilters: List<SavedJdkFilter>,
 )
 
-fun AppSettings.portablePreferences(): PortablePreferences = PortablePreferences(
-    themePreference,
-    uiDensity,
-    textScale,
-    motionPreference,
-    metadataRefreshSchedule,
-    updateNotificationPolicy,
-    operationNotificationPolicy,
-    cleanupGracePeriod,
-    showSdkmanHome,
-    favoriteCandidates,
-    favoriteJdkVendors,
-    recentCandidates,
-    toolchainProfiles,
-    navigationWidthDp,
-    installedViewMode,
-    catalogViewMode,
-    savedJdkFilters,
-)
+fun AppSettings.portablePreferences(): PortablePreferences =
+    PortablePreferences(
+        themePreference,
+        uiDensity,
+        textScale,
+        motionPreference,
+        metadataRefreshSchedule,
+        updateNotificationPolicy,
+        operationNotificationPolicy,
+        cleanupGracePeriod,
+        showSdkmanHome,
+        favoriteCandidates,
+        favoriteJdkVendors,
+        recentCandidates,
+        toolchainProfiles,
+        navigationWidthDp,
+        installedViewMode,
+        catalogViewMode,
+        savedJdkFilters,
+    )
 
-fun AppSettings.applyPortablePreferences(portable: PortablePreferences): AppSettings = copy(
-    themePreference = portable.themePreference,
-    uiDensity = portable.uiDensity,
-    textScale = portable.textScale,
-    motionPreference = portable.motionPreference,
-    metadataRefreshSchedule = portable.metadataRefreshSchedule,
-    updateNotificationPolicy = portable.updateNotificationPolicy,
-    operationNotificationPolicy = portable.operationNotificationPolicy,
-    cleanupGracePeriod = portable.cleanupGracePeriod,
-    showSdkmanHome = portable.showSdkmanHome,
-    favoriteCandidates = portable.favoriteCandidates,
-    favoriteJdkVendors = portable.favoriteJdkVendors,
-    recentCandidates = portable.recentCandidates,
-    toolchainProfiles = portable.toolchainProfiles,
-    navigationWidthDp = portable.navigationWidthDp.normalizedNavigationWidth(),
-    installedViewMode = portable.installedViewMode,
-    catalogViewMode = portable.catalogViewMode,
-    savedJdkFilters = portable.savedJdkFilters,
-)
+fun AppSettings.applyPortablePreferences(portable: PortablePreferences): AppSettings =
+    copy(
+        themePreference = portable.themePreference,
+        uiDensity = portable.uiDensity,
+        textScale = portable.textScale,
+        motionPreference = portable.motionPreference,
+        metadataRefreshSchedule = portable.metadataRefreshSchedule,
+        updateNotificationPolicy = portable.updateNotificationPolicy,
+        operationNotificationPolicy = portable.operationNotificationPolicy,
+        cleanupGracePeriod = portable.cleanupGracePeriod,
+        showSdkmanHome = portable.showSdkmanHome,
+        favoriteCandidates = portable.favoriteCandidates,
+        favoriteJdkVendors = portable.favoriteJdkVendors,
+        recentCandidates = portable.recentCandidates,
+        toolchainProfiles = portable.toolchainProfiles,
+        navigationWidthDp = portable.navigationWidthDp.normalizedNavigationWidth(),
+        installedViewMode = portable.installedViewMode,
+        catalogViewMode = portable.catalogViewMode,
+        savedJdkFilters = portable.savedJdkFilters,
+    )
 
-fun renderPortablePreferences(value: PortablePreferences): String = buildString {
-    appendLine("zephyr-portable-preferences=1")
-    appendLine("theme=${value.themePreference.name}")
-    appendLine("density=${value.uiDensity.name}")
-    appendLine("text-scale=${value.textScale.name}")
-    appendLine("motion=${value.motionPreference.name}")
-    appendLine("refresh=${value.metadataRefreshSchedule.name}")
-    appendLine("update-notifications=${value.updateNotificationPolicy.name}")
-    appendLine("operation-notifications=${value.operationNotificationPolicy.name}")
-    appendLine("cleanup-grace=${value.cleanupGracePeriod.name}")
-    appendLine("show-sdkman-home=${value.showSdkmanHome}")
-    appendLine("installed-view=${value.installedViewMode.name}")
-    appendLine("catalog-view=${value.catalogViewMode.name}")
-    appendLine("navigation-width=${value.navigationWidthDp.normalizedNavigationWidth()}")
-    value.favoriteCandidates.sorted().forEach { appendLine("favorite-candidate\t${it.escaped()}") }
-    value.favoriteJdkVendors.sorted().forEach { appendLine("favorite-vendor\t${it.escaped()}") }
-    value.recentCandidates.forEach { appendLine("recent\t${it.escaped()}") }
-    value.toolchainProfiles.sortedBy { it.name }.forEach { profile ->
-        profile.targets.sortedBy { it.candidate }.forEach { target ->
-            appendLine("profile\t${profile.name.escaped()}\t${target.candidate.escaped()}\t${target.version.escaped()}")
+fun renderPortablePreferences(value: PortablePreferences): String =
+    buildString {
+        appendLine("zephyr-portable-preferences=1")
+        appendLine("theme=${value.themePreference.name}")
+        appendLine("density=${value.uiDensity.name}")
+        appendLine("text-scale=${value.textScale.name}")
+        appendLine("motion=${value.motionPreference.name}")
+        appendLine("refresh=${value.metadataRefreshSchedule.name}")
+        appendLine("update-notifications=${value.updateNotificationPolicy.name}")
+        appendLine("operation-notifications=${value.operationNotificationPolicy.name}")
+        appendLine("cleanup-grace=${value.cleanupGracePeriod.name}")
+        appendLine("show-sdkman-home=${value.showSdkmanHome}")
+        appendLine("installed-view=${value.installedViewMode.name}")
+        appendLine("catalog-view=${value.catalogViewMode.name}")
+        appendLine("navigation-width=${value.navigationWidthDp.normalizedNavigationWidth()}")
+        value.favoriteCandidates.sorted().forEach { appendLine("favorite-candidate\t${it.escaped()}") }
+        value.favoriteJdkVendors.sorted().forEach { appendLine("favorite-vendor\t${it.escaped()}") }
+        value.recentCandidates.forEach { appendLine("recent\t${it.escaped()}") }
+        value.toolchainProfiles.sortedBy { it.name }.forEach { profile ->
+            profile.targets.sortedBy { it.candidate }.forEach { target ->
+                appendLine("profile\t${profile.name.escaped()}\t${target.candidate.escaped()}\t${target.version.escaped()}")
+            }
+        }
+        value.savedJdkFilters.sortedBy { it.name }.forEach {
+            appendLine(
+                listOf("filter", it.name, it.query, it.status, it.providerCode.orEmpty(), it.sort)
+                    .joinToString("\t") { field -> field.escaped() },
+            )
         }
     }
-    value.savedJdkFilters.sortedBy { it.name }.forEach {
-        appendLine(
-            listOf("filter", it.name, it.query, it.status, it.providerCode.orEmpty(), it.sort)
-                .joinToString("\t") { field -> field.escaped() },
-        )
-    }
-}
 
 fun parsePortablePreferences(content: String): PortablePreferences {
     val lines = content.lineSequence().filter(String::isNotBlank).toList()
     require(lines.firstOrNull() == "zephyr-portable-preferences=1") { "Unsupported portable preferences schema." }
-    val scalars = lines.drop(1).filter { '\t' !in it }.associate {
-        it.substringBefore('=') to it.substringAfter('=', "")
-    }
+    val scalars =
+        lines.drop(1).filter { '\t' !in it }.associate {
+            it.substringBefore('=') to it.substringAfter('=', "")
+        }
+
     fun scalar(key: String) = requireNotNull(scalars[key]) { "Missing $key preference." }
     val records = lines.drop(1).filter { '\t' in it }.map { it.split('\t').map(String::unescaped) }
-    val profiles = records.filter { it.first() == "profile" }
-        .groupBy { it[1] }
-        .map { (name, rows) -> ToolchainProfile(name, rows.map { InstallTarget(it[2], it[3]) }) }
+    val profiles =
+        records
+            .filter { it.first() == "profile" }
+            .groupBy { it[1] }
+            .map { (name, rows) -> ToolchainProfile(name, rows.map { InstallTarget(it[2], it[3]) }) }
     return PortablePreferences(
         enumValueOf(scalar("theme")),
         enumValueOf(scalar("density")),
@@ -133,11 +140,13 @@ private fun String.unescaped(): String {
     var escaped = false
     forEach { character ->
         if (escaped) {
-            result.append(when (character) {
-                't' -> '\t'
-                'n' -> '\n'
-                else -> character
-            })
+            result.append(
+                when (character) {
+                    't' -> '\t'
+                    'n' -> '\n'
+                    else -> character
+                },
+            )
             escaped = false
         } else if (character == '\\') {
             escaped = true

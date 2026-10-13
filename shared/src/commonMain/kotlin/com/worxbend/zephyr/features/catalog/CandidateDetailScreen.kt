@@ -51,9 +51,13 @@ internal fun CandidateDetailScreen(
     onClean: (String, List<String>) -> Unit,
     onUninstall: (String, String) -> Unit,
 ) {
-    val candidate = state.selectedCandidate?.takeIf { it.name == candidateName } ?: state.candidates.firstOrNull { it.name == candidateName }
+    val candidate =
+        state.selectedCandidate?.takeIf { it.name == candidateName } ?: state.candidates.firstOrNull { it.name == candidateName }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
-        PageTitle(candidate?.displayName ?: displayNameFor(candidateName), "Inspect versions and manage the SDKMAN candidate \"$candidateName\".")
+        PageTitle(
+            candidate?.displayName ?: displayNameFor(candidateName),
+            "Inspect versions and manage the SDKMAN candidate \"$candidateName\".",
+        )
         ZephyrPanel(Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(LocalZephyrMetrics.current.panelPadding),
@@ -82,7 +86,7 @@ internal fun CandidateDetailScreen(
                 }
             }
         }
-        if (candidate == null || state.detailLoadingCandidate == candidateName && state.selectedCandidate == null) {
+        if (candidate == null || (state.detailLoadingCandidate == candidateName && state.selectedCandidate == null)) {
             ZephyrProgressIndicator()
         } else if (jdk) {
             JdkDetailVersions(
@@ -120,10 +124,11 @@ private fun JdkDetailVersions(
 ) {
     var grouping by remember { mutableStateOf(JavaVersionGrouping.FeatureVersion) }
     var query by remember { mutableStateOf("") }
-    val groups = candidate.installedVersions
-        .map { it.toJavaVersion() }
-        .filterByQuery(query)
-        .groupBy(grouping)
+    val groups =
+        candidate.installedVersions
+            .map { it.toJavaVersion() }
+            .filterByQuery(query)
+            .groupBy(grouping)
     val updateTargets = remember(candidate.installedVersions) { candidate.installedVersions.updateTargets() }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (candidate.installedVersions.size > 3) {
@@ -142,9 +147,15 @@ private fun JdkDetailVersions(
             if (filteredOut) "No matching versions" else "No versions available",
             if (filteredOut) "No JDK versions match \"$query\"." else "Refresh SDKMAN metadata to load JDK versions.",
             if (filteredOut) "Clear search" else "Refresh metadata",
-            if (filteredOut) ({ query = "" }) else ({
-                actions.review(SdkmanTransaction.RefreshMetadata)
-            }),
+            if (filteredOut) {
+                ({ query = "" })
+            } else {
+                (
+                    {
+                        actions.review(SdkmanTransaction.RefreshMetadata)
+                    }
+                )
+            },
         )
         return
     }
@@ -160,12 +171,13 @@ private fun JdkDetailVersions(
                 items(group) { java ->
                     VersionRow(
                         candidateName = candidate.name,
-                        version = CandidateVersion(
-                            java.identifier,
-                            java.isInstalled,
-                            java.isDefault,
-                            java.remoteAvailability,
-                        ),
+                        version =
+                            CandidateVersion(
+                                java.identifier,
+                                java.isInstalled,
+                                java.isDefault,
+                                java.remoteAvailability,
+                            ),
                         updateTargets = updateTargets,
                         actions = actions,
                         sdkmanHome = sdkmanHome,
@@ -195,9 +207,10 @@ private fun VersionList(
     cleanupVersions: Set<String>,
 ) {
     var query by remember { mutableStateOf("") }
-    val versions = candidate.installedVersions.filter { version ->
-        query.isBlank() || version.version.contains(query, ignoreCase = true) || statusText(version).contains(query, ignoreCase = true)
-    }
+    val versions =
+        candidate.installedVersions.filter { version ->
+            query.isBlank() || version.version.contains(query, ignoreCase = true) || statusText(version).contains(query, ignoreCase = true)
+        }
     val updateTargets = remember(candidate.installedVersions) { candidate.installedVersions.updateTargets() }
     if (candidate.installedVersions.size > 3) {
         SearchField(query, { query = it }, "Search versions", Modifier.width(280.dp))
@@ -208,9 +221,15 @@ private fun VersionList(
             if (filteredOut) "No matching versions" else "No versions available",
             if (filteredOut) "No versions match \"$query\"." else "Refresh SDKMAN metadata to load candidate versions.",
             if (filteredOut) "Clear search" else "Refresh metadata",
-            if (filteredOut) ({ query = "" }) else ({
-                actions.review(SdkmanTransaction.RefreshMetadata)
-            }),
+            if (filteredOut) {
+                ({ query = "" })
+            } else {
+                (
+                    {
+                        actions.review(SdkmanTransaction.RefreshMetadata)
+                    }
+                )
+            },
         )
         return
     }
@@ -259,51 +278,61 @@ internal fun VersionRow(
     val clipboard = LocalAppServices.current.clipboardService
     val terminalLauncher = LocalAppServices.current.terminalLauncher
     val openTerminal = {
-        terminalMessage = if (sdkmanHome.isNullOrBlank()) {
-            "SDKMAN home is unavailable."
-        } else {
-            terminalLauncher.launch(sdkmanHome, candidateName, version.version).message
-        }
+        terminalMessage =
+            if (sdkmanHome.isNullOrBlank()) {
+                "SDKMAN home is unavailable."
+            } else {
+                terminalLauncher.launch(sdkmanHome, candidateName, version.version).message
+            }
     }
     ContextActionArea(
-        actions = buildList {
-            add(ContextAction("Copy version") { clipboard.copy(version.version) })
-            if (!version.isInstalled && version.isRemoteAvailable) {
-                add(ContextAction("Install") {
-                    actions.review(SdkmanTransaction.Install(candidateName, version.version))
-                })
-            }
-            if (version.isInstalled && !version.isDefault) {
-                add(ContextAction("Make default") {
-                    actions.review(SdkmanTransaction.SetDefault(candidateName, version.version))
-                })
-                if (!version.isConfirmedLocalOnly && !isProtected) {
-                    add(ContextAction("Uninstall") { onUninstall(candidateName, version.version) })
+        actions =
+            buildList {
+                add(ContextAction("Copy version") { clipboard.copy(version.version) })
+                if (!version.isInstalled && version.isRemoteAvailable) {
+                    add(
+                        ContextAction("Install") {
+                            actions.review(SdkmanTransaction.Install(candidateName, version.version))
+                        },
+                    )
                 }
-            }
-            if (version.isInstalled) {
-                add(
-                    ContextAction(
-                        label = "Open activated terminal",
-                        enabled = !sdkmanHome.isNullOrBlank(),
-                        onClick = openTerminal,
-                    ),
-                )
-                add(ContextAction(if (isProtected) "Unpin" else "Protect") {
-                    actions.protect(candidateName, version.version, !isProtected)
-                })
-            }
-            if (version.isInstalled && version.isConfirmedLocalOnly) {
-                updateTargets.forEach { target ->
-                    add(ContextAction("Install update ${target.version}") {
-                        actions.review(SdkmanTransaction.Install(candidateName, target.version))
-                    })
+                if (version.isInstalled && !version.isDefault) {
+                    add(
+                        ContextAction("Make default") {
+                            actions.review(SdkmanTransaction.SetDefault(candidateName, version.version))
+                        },
+                    )
+                    if (!version.isConfirmedLocalOnly && !isProtected) {
+                        add(ContextAction("Uninstall") { onUninstall(candidateName, version.version) })
+                    }
                 }
-            }
-            if (cleanupEligible) {
-                add(ContextAction("Clean") { onClean(candidateName, listOf(version.version)) })
-            }
-        },
+                if (version.isInstalled) {
+                    add(
+                        ContextAction(
+                            label = "Open activated terminal",
+                            enabled = !sdkmanHome.isNullOrBlank(),
+                            onClick = openTerminal,
+                        ),
+                    )
+                    add(
+                        ContextAction(if (isProtected) "Unpin" else "Protect") {
+                            actions.protect(candidateName, version.version, !isProtected)
+                        },
+                    )
+                }
+                if (version.isInstalled && version.isConfirmedLocalOnly) {
+                    updateTargets.forEach { target ->
+                        add(
+                            ContextAction("Install update ${target.version}") {
+                                actions.review(SdkmanTransaction.Install(candidateName, target.version))
+                            },
+                        )
+                    }
+                }
+                if (cleanupEligible) {
+                    add(ContextAction("Clean") { onClean(candidateName, listOf(version.version)) })
+                }
+            },
         modifier = Modifier.fillMaxWidth(),
     ) {
         ZephyrPanel(Modifier.fillMaxWidth()) {
@@ -367,23 +396,29 @@ internal fun VersionRow(
                     }
                 }
                 if (version.isInstalled && version.isConfirmedLocalOnly) {
-                    if (updateTargets.isNotEmpty()) Box {
-                        OutlinedButton(onClick = { updateMenuOpen = true }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) { Text("Update") }
-                        DropdownMenu(expanded = updateMenuOpen, onDismissRequest = { updateMenuOpen = false }) {
-                            updateTargets.forEach { target ->
-                                DropdownMenuItem(
-                                    text = { Text(target.version) },
-                                    onClick = {
-                                        updateMenuOpen = false
-                                        actions.review(SdkmanTransaction.Install(candidateName, target.version))
-                                    },
-                                )
+                    if (updateTargets.isNotEmpty()) {
+                        Box {
+                            OutlinedButton(onClick = {
+                                updateMenuOpen = true
+                            }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) { Text("Update") }
+                            DropdownMenu(expanded = updateMenuOpen, onDismissRequest = { updateMenuOpen = false }) {
+                                updateTargets.forEach { target ->
+                                    DropdownMenuItem(
+                                        text = { Text(target.version) },
+                                        onClick = {
+                                            updateMenuOpen = false
+                                            actions.review(SdkmanTransaction.Install(candidateName, target.version))
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
                 if (version.isInstalled && !version.isDefault && !version.isConfirmedLocalOnly && !isProtected) {
-                    OutlinedButton(onClick = { onUninstall(candidateName, version.version) }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) {
+                    OutlinedButton(onClick = {
+                        onUninstall(candidateName, version.version)
+                    }, modifier = Modifier.heightIn(min = LocalZephyrMetrics.current.controlHeight)) {
                         Text("Uninstall")
                     }
                 }

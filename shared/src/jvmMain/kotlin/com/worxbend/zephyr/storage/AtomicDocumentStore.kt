@@ -14,13 +14,16 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
 
 /** Single-process storage boundary; no cross-process compare-and-swap guarantee. */
-internal class AtomicDocumentStore(private val destination: Path) {
+internal class AtomicDocumentStore(
+    private val destination: Path,
+) {
     fun read(): String? {
-        val attributes = try {
-            Files.readAttributes(destination, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
-        } catch (_: NoSuchFileException) {
-            return null
-        }
+        val attributes =
+            try {
+                Files.readAttributes(destination, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+            } catch (_: NoSuchFileException) {
+                return null
+            }
         check(attributes.isRegularFile && !attributes.isSymbolicLink) { "Document is not a regular file." }
         check(attributes.size() <= MAX_DOCUMENT_BYTES) { "Document is too large." }
         // Open without following the leaf even if it changes after the attribute check.
@@ -63,7 +66,10 @@ internal class AtomicDocumentStore(private val destination: Path) {
     }
 }
 
-private fun ownerOnly(path: Path, directory: Boolean) {
+private fun ownerOnly(
+    path: Path,
+    directory: Boolean,
+) {
     val permissions = mutableSetOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
     if (directory) permissions += PosixFilePermission.OWNER_EXECUTE
     try {
@@ -72,4 +78,5 @@ private fun ownerOnly(path: Path, directory: Boolean) {
         // Windows does not expose POSIX permissions; the platform directory ACL applies.
     }
 }
+
 private const val MAX_DOCUMENT_BYTES = 8L * 1_024 * 1_024

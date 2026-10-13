@@ -65,11 +65,12 @@ internal fun BatchUninstallScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ZephyrToolbarButton(
-                label = if (selected.size == eligible.size && eligible.isNotEmpty()) {
-                    "Clear selection"
-                } else {
-                    "Select all eligible"
-                },
+                label =
+                    if (selected.size == eligible.size && eligible.isNotEmpty()) {
+                        "Clear selection"
+                    } else {
+                        "Select all eligible"
+                    },
                 onClick = {
                     selected = if (selected.size == eligible.size) emptySet() else eligibleIds.toSet()
                 },
@@ -84,9 +85,10 @@ internal fun BatchUninstallScreen(
             ZephyrDestructiveButton(
                 label = "Review uninstall (${selected.size})",
                 onClick = {
-                    val targets = eligible
-                        .filter { "${it.target.candidate}:${it.target.version}" in selected }
-                        .map { it.target }
+                    val targets =
+                        eligible
+                            .filter { "${it.target.candidate}:${it.target.version}" in selected }
+                            .map { it.target }
                     if (targets.isNotEmpty()) {
                         viewModel.requestTransaction(SdkmanTransaction.BatchUninstall(targets))
                     }

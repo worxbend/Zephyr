@@ -30,14 +30,20 @@ data class ProjectWorkspaceDocument(
 
 interface ProjectToolchainService {
     suspend fun chooseAndRead(): SdkmanRcDocument?
+
     suspend fun chooseAndWrite(targets: List<InstallTarget>): SdkmanRcExportResult?
+
     suspend fun chooseWorkspace(): ProjectWorkspaceDocument?
+
     suspend fun readWorkspace(reference: ProjectWorkspaceReference): ProjectWorkspaceDocument
 }
 
 expect fun createProjectToolchainService(): ProjectToolchainService
 
-fun parseSdkmanRc(fileName: String, content: String): SdkmanRcDocument {
+fun parseSdkmanRc(
+    fileName: String,
+    content: String,
+): SdkmanRcDocument {
     val targets = mutableListOf<InstallTarget>()
     val warnings = mutableListOf<String>()
     content.lineSequence().forEachIndexed { index, rawLine ->

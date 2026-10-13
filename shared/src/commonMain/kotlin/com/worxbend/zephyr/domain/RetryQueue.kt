@@ -1,6 +1,8 @@
 package com.worxbend.zephyr.domain
 
-enum class RetryableReadOperation(val label: String) {
+enum class RetryableReadOperation(
+    val label: String,
+) {
     InstalledCandidates("installed toolchains"),
     CandidateCatalog("candidate catalog"),
     CandidateDetail("candidate versions"),

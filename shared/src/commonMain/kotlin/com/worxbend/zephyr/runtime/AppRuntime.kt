@@ -13,10 +13,11 @@ class AppRuntime(
     val services: AppServices,
     private val policies: AppPolicyCoordinator,
 ) {
-    private val shutdown = AppShutdownCoordinator(settings) {
-        check(policies.closeAndJoin()) { "Application policies have not finished shutting down." }
-        check(viewModel.shutdownAndJoin()) { "Task shutdown or receipt persistence was not acknowledged." }
-    }
+    private val shutdown =
+        AppShutdownCoordinator(settings) {
+            check(policies.closeAndJoin()) { "Application policies have not finished shutting down." }
+            check(viewModel.shutdownAndJoin()) { "Task shutdown or receipt persistence was not acknowledged." }
+        }
     val isClosed: Boolean get() = shutdown.isClosed
 
     suspend fun requestClose(

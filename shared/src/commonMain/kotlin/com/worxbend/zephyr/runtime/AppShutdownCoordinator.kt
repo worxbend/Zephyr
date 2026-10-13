@@ -14,11 +14,12 @@ class AppShutdownCoordinator(
     private var acknowledgement: SettingsCloseResult.Saved? = null
     val isClosed: Boolean get() = acknowledgement != null
 
-    suspend fun requestClose(timeoutMillis: Long = 5_000): SettingsCloseResult = mutex.withLock {
-        acknowledgement?.let { return@withLock it }
-        quiesceOperations()
-        settings.flushAndClose(timeoutMillis).also { result ->
-            if (result is SettingsCloseResult.Saved) acknowledgement = result
+    suspend fun requestClose(timeoutMillis: Long = 5_000): SettingsCloseResult =
+        mutex.withLock {
+            acknowledgement?.let { return@withLock it }
+            quiesceOperations()
+            settings.flushAndClose(timeoutMillis).also { result ->
+                if (result is SettingsCloseResult.Saved) acknowledgement = result
+            }
         }
-    }
 }

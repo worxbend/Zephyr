@@ -9,8 +9,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OperationCompletionTrackerTest {
-    private fun entry(id: Long, completed: Long? = 2L) = OperationJournalEntry(
-        id = id, transaction = SdkmanTransaction.Install("gradle", "8.0"), startedAtEpochMillis = 1L,
+    private fun entry(
+        id: Long,
+        completed: Long? = 2L,
+    ) = OperationJournalEntry(
+        id = id,
+        transaction = SdkmanTransaction.Install("gradle", "8.0"),
+        startedAtEpochMillis = 1L,
         completedAtEpochMillis = completed,
         status = if (completed == null) OperationStatus.Running else OperationStatus.Succeeded,
     )

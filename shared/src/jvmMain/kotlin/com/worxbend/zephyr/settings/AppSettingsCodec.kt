@@ -30,7 +30,9 @@ internal object AppSettingsCodec {
                 writeString(settings.operationNotificationPolicy.name)
                 writeString(settings.cleanupGracePeriod.name)
                 writeItems(settings.localOnlyObservations) {
-                    writeString(it.candidate); writeString(it.version); writeLong(it.firstSeenEpochMillis)
+                    writeString(it.candidate)
+                    writeString(it.version)
+                    writeLong(it.firstSeenEpochMillis)
                 }
                 writeBoolean(settings.showSdkmanHome)
                 writeItems(settings.favoriteCandidates) { writeString(it) }
@@ -38,13 +40,21 @@ internal object AppSettingsCodec {
                 writeItems(settings.recentCandidates) { writeString(it) }
                 writeItems(settings.toolchainProfiles) { profile ->
                     writeString(profile.name)
-                    writeItems(profile.targets) { writeString(it.candidate); writeString(it.version) }
+                    writeItems(profile.targets) {
+                        writeString(it.candidate)
+                        writeString(it.version)
+                    }
                 }
-                writeItems(settings.projectWorkspaces) { writeString(it.sdkmanRcPath); writeString(it.displayName) }
+                writeItems(settings.projectWorkspaces) {
+                    writeString(it.sdkmanRcPath)
+                    writeString(it.displayName)
+                }
                 val desired = settings.desiredToolchainState
                 writeBoolean(desired != null)
                 if (desired != null) {
-                    writeInt(desired.schemaVersion); writeString(desired.sourceKind.name); writeString(desired.sourceLabel)
+                    writeInt(desired.schemaVersion)
+                    writeString(desired.sourceKind.name)
+                    writeString(desired.sourceLabel)
                     writeItems(desired.candidates) {
                         writeString(it.candidate)
                         writeBoolean(it.defaultVersion != null)
@@ -53,9 +63,12 @@ internal object AppSettingsCodec {
                     }
                 }
                 writeInt(settings.navigationWidthDp)
-                writeString(settings.installedViewMode.name); writeString(settings.catalogViewMode.name)
+                writeString(settings.installedViewMode.name)
+                writeString(settings.catalogViewMode.name)
                 writeItems(settings.savedJdkFilters) {
-                    writeString(it.name); writeString(it.query); writeString(it.status)
+                    writeString(it.name)
+                    writeString(it.query)
+                    writeString(it.status)
                     writeBoolean(it.providerCode != null)
                     it.providerCode?.let { provider -> writeString(provider) }
                     writeString(it.sort)
@@ -79,43 +92,53 @@ internal object AppSettingsCodec {
         require(fields[1] == digest(bytes)) { "Settings snapshot integrity check failed." }
         return DataInputStream(ByteArrayInputStream(bytes)).use { input ->
             with(input) {
-                val settings = AppSettings(
-                    themePreference = enumValueOf(readUTF()),
-                    uiDensity = enumValueOf(readUTF()),
-                    textScale = enumValueOf(readUTF()),
-                    motionPreference = enumValueOf(readUTF()),
-                    metadataRefreshSchedule = enumValueOf(readUTF()),
-                    updateNotificationPolicy = enumValueOf(readUTF()),
-                    operationNotificationPolicy = enumValueOf(readUTF()),
-                    cleanupGracePeriod = enumValueOf(readUTF()),
-                    localOnlyObservations = readItems {
-                        LocalOnlyObservation(readUTF(), readUTF(), readLong()).also {
-                            require(it.candidate.isNotBlank() && it.version.isNotBlank() && it.firstSeenEpochMillis >= 0)
-                        }
-                    },
-                    showSdkmanHome = readBoolean(),
-                    favoriteCandidates = readItems(::readUTF).toSet(),
-                    favoriteJdkVendors = readItems(::readUTF).toSet(),
-                    recentCandidates = readItems(::readUTF),
-                    toolchainProfiles = readItems {
-                        ToolchainProfile(readUTF(), readItems { InstallTarget(readUTF(), readUTF()) })
-                    },
-                    projectWorkspaces = readItems { ProjectWorkspaceReference(readUTF(), readUTF()) },
-                    desiredToolchainState = if (readBoolean()) DesiredToolchainState(
-                        schemaVersion = readInt(),
-                        sourceKind = DesiredStateSourceKind.valueOf(readUTF()),
-                        sourceLabel = readUTF(),
-                        candidates = readItems {
-                            DesiredCandidateState(readUTF(), if (readBoolean()) readUTF() else null, readItems(::readUTF))
-                        },
-                    ) else null,
-                    navigationWidthDp = readInt(),
-                    installedViewMode = enumValueOf(readUTF()),
-                    catalogViewMode = enumValueOf(readUTF()),
-                    savedJdkFilters = readItems {
-                        SavedJdkFilter(readUTF(), readUTF(), readUTF(), if (readBoolean()) readUTF() else null, readUTF())
-                    },
-                )
+                val settings =
+                    AppSettings(
+                        themePreference = enumValueOf(readUTF()),
+                        uiDensity = enumValueOf(readUTF()),
+                        textScale = enumValueOf(readUTF()),
+                        motionPreference = enumValueOf(readUTF()),
+                        metadataRefreshSchedule = enumValueOf(readUTF()),
+                        updateNotificationPolicy = enumValueOf(readUTF()),
+                        operationNotificationPolicy = enumValueOf(readUTF()),
+                        cleanupGracePeriod = enumValueOf(readUTF()),
+                        localOnlyObservations =
+                            readItems {
+                                LocalOnlyObservation(readUTF(), readUTF(), readLong()).also {
+                                    require(it.candidate.isNotBlank() && it.version.isNotBlank() && it.firstSeenEpochMillis >= 0)
+                                }
+                            },
+                        showSdkmanHome = readBoolean(),
+                        favoriteCandidates = readItems(::readUTF).toSet(),
+                        favoriteJdkVendors = readItems(::readUTF).toSet(),
+                        recentCandidates = readItems(::readUTF),
+                        toolchainProfiles =
+                            readItems {
+                                ToolchainProfile(readUTF(), readItems { InstallTarget(readUTF(), readUTF()) })
+                            },
+                        projectWorkspaces = readItems { ProjectWorkspaceReference(readUTF(), readUTF()) },
+                        desiredToolchainState =
+                            if (readBoolean()) {
+                                DesiredToolchainState(
+                                    schemaVersion = readInt(),
+                                    sourceKind = DesiredStateSourceKind.valueOf(readUTF()),
+                                    sourceLabel = readUTF(),
+                                    candidates =
+                                        readItems {
+                                            DesiredCandidateState(readUTF(), if (readBoolean()) readUTF() else null, readItems(::readUTF))
+                                        },
+                                )
+                            } else {
+                                null
+                            },
+                        navigationWidthDp = readInt(),
+                        installedViewMode = enumValueOf(readUTF()),
+                        catalogViewMode = enumValueOf(readUTF()),
+                        savedJdkFilters =
+                            readItems {
+                                SavedJdkFilter(readUTF(), readUTF(), readUTF(), if (readBoolean()) readUTF() else null, readUTF())
+                            },
+                    )
                 require(available() == 0) { "Trailing settings snapshot data." }
                 settings
             }
@@ -132,16 +155,23 @@ internal object AppSettingsCodec {
             require(count < MAX_DOCUMENT_LENGTH) { "Settings snapshot exceeds the persistence limit." }
             super.write(value)
         }
-        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+
+        override fun write(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
             require(length <= MAX_DOCUMENT_LENGTH - count) { "Settings snapshot exceeds the persistence limit." }
             super.write(bytes, offset, length)
         }
     }
 
-    private fun digest(bytes: ByteArray): String =
-        Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes))
+    private fun digest(bytes: ByteArray): String = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes))
 
-    private fun <T> DataOutputStream.writeItems(items: Collection<T>, write: (T) -> Unit) {
+    private fun <T> DataOutputStream.writeItems(
+        items: Collection<T>,
+        write: (T) -> Unit,
+    ) {
         require(items.size <= MAX_ITEMS) { "Too many settings records." }
         writeInt(items.size)
         items.forEach(write)

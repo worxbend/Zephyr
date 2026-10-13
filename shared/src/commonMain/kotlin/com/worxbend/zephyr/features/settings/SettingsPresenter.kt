@@ -39,19 +39,32 @@ class SettingsPresenter(
     private val mutableState = MutableStateFlow(SettingsState())
     val state = mutableState.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+    }
 
     fun editProxy(transform: (ProxyConfiguration) -> ProxyConfiguration) {
         if (!state.value.busy && state.value.loaded) mutableState.update { it.copy(proxy = transform(it.proxy)) }
     }
+
     fun editPort(value: String) {
         if (!state.value.busy && state.value.loaded) mutableState.update { it.copy(port = value.filter(Char::isDigit).take(5)) }
     }
-    fun load() = work("load") {
-        val configuration = proxyService.load()
-        val home = homeService.configuredPath()
-        mutableState.update { it.copy(proxy = configuration, port = configuration.port.toString(), customSdkmanHome = home, loaded = true) }
-    }
+
+    fun load() =
+        work("load") {
+            val configuration = proxyService.load()
+            val home = homeService.configuredPath()
+            mutableState.update {
+                it.copy(
+                    proxy = configuration,
+                    port = configuration.port.toString(),
+                    customSdkmanHome = home,
+                    loaded = true,
+                )
+            }
+        }
+
     fun saveProxy(password: String?) {
         if (!state.value.loaded) return
         val draft = state.value
@@ -61,42 +74,66 @@ class SettingsPresenter(
             if (result.success || result.settingsSaved || result.recoveryRequired) reloadProxy()
         }
     }
-    fun clearPassword() = work("proxy") {
-        val result = proxyService.clearPassword()
-        mutableState.update { it.copy(proxyMessage = result.message) }
-        if (result.success || result.settingsSaved || result.recoveryRequired) reloadProxy()
-    }
+
+    fun clearPassword() =
+        work("proxy") {
+            val result = proxyService.clearPassword()
+            mutableState.update { it.copy(proxyMessage = result.message) }
+            if (result.success || result.settingsSaved || result.recoveryRequired) reloadProxy()
+        }
+
     private suspend fun reloadProxy() {
         val configuration = proxyService.load()
         mutableState.update { it.copy(proxy = configuration, port = configuration.port.toString()) }
     }
-    fun chooseHome() = work("home") {
-        homeService.chooseAndSave()?.let { result ->
-            mutableState.update { it.copy(sdkmanHomeMessage = result.message, customSdkmanHome = if (result.success) result.path else it.customSdkmanHome) }
+
+    fun chooseHome() =
+        work("home") {
+            homeService.chooseAndSave()?.let { result ->
+                mutableState.update {
+                    it.copy(sdkmanHomeMessage = result.message, customSdkmanHome = if (result.success) result.path else it.customSdkmanHome)
+                }
+            }
         }
-    }
-    fun clearHome() = work("home") {
-        val result = homeService.clear()
-        mutableState.update { it.copy(sdkmanHomeMessage = result.message, customSdkmanHome = if (result.success) null else it.customSdkmanHome) }
-    }
-    fun exportPreferences(settings: AppSettings) = work("preferences") {
-        preferencesService.chooseAndWrite(settings.portablePreferences())?.let { file ->
-            mutableState.update { it.copy(portablePreferencesMessage = "Exported portable preferences to $file.") }
+
+    fun clearHome() =
+        work("home") {
+            val result = homeService.clear()
+            mutableState.update {
+                it.copy(
+                    sdkmanHomeMessage = result.message,
+                    customSdkmanHome = if (result.success) null else it.customSdkmanHome,
+                )
+            }
         }
-    }
-    fun importPreferences(onSettingsChange: ((AppSettings) -> AppSettings) -> Unit) = work("preferences") {
-        preferencesService.chooseAndRead()?.let { portable ->
-            onSettingsChange { it.applyPortablePreferences(portable) }
-            mutableState.update { it.copy(portablePreferencesMessage = "Imported portable preferences.") }
+
+    fun exportPreferences(settings: AppSettings) =
+        work("preferences") {
+            preferencesService.chooseAndWrite(settings.portablePreferences())?.let { file ->
+                mutableState.update { it.copy(portablePreferencesMessage = "Exported portable preferences to $file.") }
+            }
         }
-    }
-    private fun work(section: String, action: suspend () -> Unit) {
+
+    fun importPreferences(onSettingsChange: ((AppSettings) -> AppSettings) -> Unit) =
+        work("preferences") {
+            preferencesService.chooseAndRead()?.let { portable ->
+                onSettingsChange { it.applyPortablePreferences(portable) }
+                mutableState.update { it.copy(portablePreferencesMessage = "Imported portable preferences.") }
+            }
+        }
+
+    private fun work(
+        section: String,
+        action: suspend () -> Unit,
+    ) {
         if (state.value.busy) return
         mutableState.update { it.copy(busy = true) }
         scope.launch {
-            try { action() }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: Exception) {
+            try {
+                action()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
                 val message = failure.message ?: "Settings operation failed."
                 mutableState.update {
                     when (section) {
@@ -105,8 +142,11 @@ class SettingsPresenter(
                         else -> it.copy(proxyMessage = message)
                     }
                 }
-            } finally { mutableState.update { it.copy(busy = false) } }
+            } finally {
+                mutableState.update { it.copy(busy = false) }
+            }
         }
     }
+
     fun close() = scope.cancel()
 }

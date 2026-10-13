@@ -1,9 +1,9 @@
 package com.worxbend.zephyr.settings
 
-import com.worxbend.zephyr.domain.InstallTarget
 import com.worxbend.zephyr.domain.DesiredCandidateState
 import com.worxbend.zephyr.domain.DesiredStateSourceKind
 import com.worxbend.zephyr.domain.DesiredToolchainState
+import com.worxbend.zephyr.domain.InstallTarget
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
@@ -17,10 +17,11 @@ internal object LegacySettingsCodec {
             motionPreference = values.enumValue(MOTION_KEY, MotionPreference.System),
             metadataRefreshSchedule = values.enumValue(REFRESH_SCHEDULE_KEY, MetadataRefreshSchedule.Off),
             updateNotificationPolicy = values.enumValue(NOTIFICATION_POLICY_KEY, UpdateNotificationPolicy.Off),
-            operationNotificationPolicy = values.enumValue(
-                OPERATION_NOTIFICATION_POLICY_KEY,
-                OperationNotificationPolicy.Off,
-            ),
+            operationNotificationPolicy =
+                values.enumValue(
+                    OPERATION_NOTIFICATION_POLICY_KEY,
+                    OperationNotificationPolicy.Off,
+                ),
             cleanupGracePeriod = values.enumValue(CLEANUP_GRACE_KEY, CleanupGracePeriod.Off),
             localOnlyObservations = values.localOnlyObservations(LOCAL_ONLY_OBSERVATIONS_KEY),
             showSdkmanHome = values[SHOW_SDKMAN_HOME_KEY]?.toBooleanStrict() ?: true,
@@ -36,7 +37,10 @@ internal object LegacySettingsCodec {
             savedJdkFilters = values.savedJdkFilters(SAVED_JDK_FILTERS_KEY),
         )
 
-    private inline fun <reified T : Enum<T>> Map<String, String>.enumValue(key: String, fallback: T): T =
+    private inline fun <reified T : Enum<T>> Map<String, String>.enumValue(
+        key: String,
+        fallback: T,
+    ): T =
         getOrDefault(key, fallback.name)
             .let { stored -> enumValues<T>().firstOrNull { it.name == stored } }
             ?: error("Unsupported legacy settings enum: $key")
@@ -48,7 +52,6 @@ internal object LegacySettingsCodec {
             .filter(String::isNotEmpty)
             .toSet()
 
-
     private fun Map<String, String>.stringList(key: String): List<String> =
         getOrDefault(key, "")
             .lineSequence()
@@ -56,7 +59,6 @@ internal object LegacySettingsCodec {
             .filter(String::isNotEmpty)
             .distinct()
             .toList()
-
 
     private fun Map<String, String>.profiles(key: String): List<ToolchainProfile> =
         getOrDefault(key, "")
@@ -67,17 +69,16 @@ internal object LegacySettingsCodec {
                     val decoded = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
                     val fields = decoded.split(PROFILE_FIELD_SEPARATOR)
                     val name = fields.firstOrNull()?.trim().orEmpty()
-                    val targets = fields.drop(1).map { target ->
-                        val parts = target.split(TARGET_FIELD_SEPARATOR, limit = 2)
-                        require(parts.size == 2 && parts.all(String::isNotBlank)) { "Invalid legacy profile target." }
-                        InstallTarget(parts[0], parts[1])
-                    }
+                    val targets =
+                        fields.drop(1).map { target ->
+                            val parts = target.split(TARGET_FIELD_SEPARATOR, limit = 2)
+                            require(parts.size == 2 && parts.all(String::isNotBlank)) { "Invalid legacy profile target." }
+                            InstallTarget(parts[0], parts[1])
+                        }
                     require(name.isNotEmpty() && targets.isNotEmpty()) { "Invalid legacy profile." }
                     ToolchainProfile(name, targets)
                 }.getOrThrow()
-            }
-            .toList()
-
+            }.toList()
 
     private fun Map<String, String>.projectWorkspaces(key: String): List<ProjectWorkspaceReference> =
         getOrDefault(key, "")
@@ -85,40 +86,41 @@ internal object LegacySettingsCodec {
             .filter(String::isNotEmpty)
             .mapNotNull { encoded ->
                 runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR, limit = 2)
+                    val fields =
+                        String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
+                            .split(PROFILE_FIELD_SEPARATOR, limit = 2)
                     require(fields.size == 2) { "Invalid legacy workspace." }
                     ProjectWorkspaceReference(fields[0], fields[1])
                 }.getOrThrow()
-            }
-            .distinctBy(ProjectWorkspaceReference::sdkmanRcPath)
+            }.distinctBy(ProjectWorkspaceReference::sdkmanRcPath)
             .toList()
-
 
     private fun Map<String, String>.desiredToolchainState(): DesiredToolchainState? {
         val chunks = (get(DESIRED_STATE_CHUNK_COUNT_KEY)?.toInt() ?: 0)
         if (chunks == 0) return null
         require(chunks in 1..MAX_DESIRED_STATE_CHUNKS) { "Invalid legacy desired state chunk count." }
-        val encoded = buildString {
-            repeat(chunks) { index ->
-                append(getValue("$DESIRED_STATE_CHUNK_PREFIX$index"))
+        val encoded =
+            buildString {
+                repeat(chunks) { index ->
+                    append(getValue("$DESIRED_STATE_CHUNK_PREFIX$index"))
+                }
             }
-        }
         require(encoded.isNotEmpty()) { "Empty legacy desired state." }
         return runCatching {
             val content = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
             val lines = content.lineSequence().filter(String::isNotBlank).toList()
             val header = lines.first().split(PROFILE_FIELD_SEPARATOR)
             require(header.size == 3)
-            val candidates = lines.drop(1).map { line ->
-                val fields = line.split(PROFILE_FIELD_SEPARATOR)
-                require(fields.size == 3)
-                DesiredCandidateState(
-                    candidate = fields[0],
-                    defaultVersion = fields[1].ifEmpty { null },
-                    installedVersions = fields[2].split(',').filter(String::isNotBlank),
-                )
-            }
+            val candidates =
+                lines.drop(1).map { line ->
+                    val fields = line.split(PROFILE_FIELD_SEPARATOR)
+                    require(fields.size == 3)
+                    DesiredCandidateState(
+                        candidate = fields[0],
+                        defaultVersion = fields[1].ifEmpty { null },
+                        installedVersions = fields[2].split(',').filter(String::isNotBlank),
+                    )
+                }
             DesiredToolchainState(
                 schemaVersion = header[0].toInt(),
                 sourceKind = DesiredStateSourceKind.valueOf(header[1]),
@@ -128,15 +130,15 @@ internal object LegacySettingsCodec {
         }.getOrThrow()
     }
 
-
     private fun Map<String, String>.savedJdkFilters(key: String): List<SavedJdkFilter> =
         getOrDefault(key, "")
             .lineSequence()
             .filter(String::isNotEmpty)
             .mapNotNull { encoded ->
                 runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR)
+                    val fields =
+                        String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
+                            .split(PROFILE_FIELD_SEPARATOR)
                     require(fields.size == 5 && fields[0].isNotBlank()) { "Invalid legacy saved filter." }
                     SavedJdkFilter(
                         name = fields[0],
@@ -146,9 +148,7 @@ internal object LegacySettingsCodec {
                         sort = fields[4],
                     )
                 }.getOrThrow()
-            }
-            .toList()
-
+            }.toList()
 
     private fun Map<String, String>.localOnlyObservations(key: String): List<LocalOnlyObservation> =
         getOrDefault(key, "")
@@ -156,8 +156,9 @@ internal object LegacySettingsCodec {
             .filter(String::isNotEmpty)
             .mapNotNull { encoded ->
                 runCatching {
-                    val fields = String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
-                        .split(PROFILE_FIELD_SEPARATOR)
+                    val fields =
+                        String(PROFILE_DECODER.decode(encoded), StandardCharsets.UTF_8)
+                            .split(PROFILE_FIELD_SEPARATOR)
                     require(fields.size == 3) { "Invalid legacy observation." }
                     LocalOnlyObservation(
                         candidate = fields[0],
@@ -169,9 +170,7 @@ internal object LegacySettingsCodec {
                         }
                     }
                 }.getOrThrow()
-            }
-            .toList()
-
+            }.toList()
 
     private const val THEME_KEY = "theme"
     private const val DENSITY_KEY = "density"

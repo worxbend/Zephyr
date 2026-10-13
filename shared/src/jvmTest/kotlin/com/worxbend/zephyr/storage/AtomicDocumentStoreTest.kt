@@ -23,7 +23,9 @@ class AtomicDocumentStoreTest {
             assertEquals("second", store.read())
             assertEquals(setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE), Files.getPosixFilePermissions(path))
             Files.list(directory).use { assertEquals(listOf(path), it.toList()) }
-        } finally { directory.toFile().deleteRecursively() }
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 
     @Test
@@ -37,7 +39,9 @@ class AtomicDocumentStoreTest {
             assertFailsWith<IllegalStateException> { store.replace("x".repeat(8 * 1_024 * 1_024 + 1)) }
             assertContentEquals(bytes, Files.readAllBytes(path))
             Files.list(directory).use { assertEquals(listOf(path), it.toList()) }
-        } finally { directory.toFile().deleteRecursively() }
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 
     @Test
@@ -54,7 +58,9 @@ class AtomicDocumentStoreTest {
             assertFalse(Files.isSymbolicLink(path))
             assertEquals("app document", store.read())
             assertEquals("external evidence", Files.readString(external))
-        } finally { directory.toFile().deleteRecursively() }
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 
     @Test
@@ -67,6 +73,8 @@ class AtomicDocumentStoreTest {
             Files.createSymbolicLink(alias, external)
             assertFailsWith<IllegalStateException> { AtomicDocumentStore(alias.resolve("journal")).replace("new") }
             Files.list(external).use { assertTrue(it.toList().isEmpty()) }
-        } finally { directory.toFile().deleteRecursively() }
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
     }
 }

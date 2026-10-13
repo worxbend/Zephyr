@@ -3,8 +3,8 @@ package com.worxbend.zephyr.data
 import com.worxbend.zephyr.domain.Candidate
 import com.worxbend.zephyr.domain.CandidateKind
 import com.worxbend.zephyr.domain.CandidateVersion
-import com.worxbend.zephyr.domain.RemoteAvailability
 import com.worxbend.zephyr.domain.PlannedSdkmanCommand
+import com.worxbend.zephyr.domain.RemoteAvailability
 import com.worxbend.zephyr.domain.SdkmanCommandAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,10 +12,11 @@ import kotlin.test.assertEquals
 class EnvironmentSnapshotServiceTest {
     @Test
     fun captureAndRenderingAreDeterministic() {
-        val candidates = listOf(
-            candidate("java", "21-tem", "21-tem", "17-tem"),
-            candidate("gradle", "8.14", "8.14"),
-        )
+        val candidates =
+            listOf(
+                candidate("java", "21-tem", "21-tem", "17-tem"),
+                candidate("gradle", "8.14", "8.14"),
+            )
         val first = captureEnvironmentSnapshot(candidates, 42)
         val second = captureEnvironmentSnapshot(candidates.reversed(), 42)
 
@@ -25,14 +26,16 @@ class EnvironmentSnapshotServiceTest {
 
     @Test
     fun diffIgnoresInputOrderAndReportsVersionAndDefaultChanges() {
-        val previous = captureEnvironmentSnapshot(
-            listOf(candidate("java", "17-tem", "21-tem", "17-tem")),
-            1,
-        )
-        val current = captureEnvironmentSnapshot(
-            listOf(candidate("java", "21-tem", "22-tem", "21-tem")),
-            2,
-        )
+        val previous =
+            captureEnvironmentSnapshot(
+                listOf(candidate("java", "17-tem", "21-tem", "17-tem")),
+                1,
+            )
+        val current =
+            captureEnvironmentSnapshot(
+                listOf(candidate("java", "21-tem", "22-tem", "21-tem")),
+                2,
+            )
 
         assertEquals(
             listOf(
@@ -50,13 +53,14 @@ class EnvironmentSnapshotServiceTest {
 
     @Test
     fun restorePlanInstallsMissingVersionsBeforeChangingDefaultsAndCanResume() {
-        val snapshot = captureEnvironmentSnapshot(
-            listOf(
-                candidate("java", "21-tem", "17-tem", "21-tem"),
-                candidate("gradle", "8.14", "8.14"),
-            ),
-            1,
-        )
+        val snapshot =
+            captureEnvironmentSnapshot(
+                listOf(
+                    candidate("java", "21-tem", "17-tem", "21-tem"),
+                    candidate("gradle", "8.14", "8.14"),
+                ),
+                1,
+            )
         val current = listOf(candidate("java", "17-tem", "17-tem"))
 
         assertEquals(
@@ -69,10 +73,11 @@ class EnvironmentSnapshotServiceTest {
             planSnapshotRestore(snapshot, current),
         )
 
-        val afterPartialRun = listOf(
-            candidate("java", "17-tem", "17-tem", "21-tem"),
-            candidate("gradle", null, "8.14"),
-        )
+        val afterPartialRun =
+            listOf(
+                candidate("java", "17-tem", "17-tem", "21-tem"),
+                candidate("gradle", null, "8.14"),
+            )
         assertEquals(
             listOf(
                 PlannedSdkmanCommand(SdkmanCommandAction.SetDefault, "gradle", "8.14"),
@@ -82,12 +87,16 @@ class EnvironmentSnapshotServiceTest {
         )
     }
 
-    private fun candidate(name: String, default: String?, vararg versions: String) =
-        Candidate(
-            name = name,
-            displayName = name,
-            kind = if (name == "java") CandidateKind.Jdk else CandidateKind.Sdk,
-            installedVersions = versions.map {
+    private fun candidate(
+        name: String,
+        default: String?,
+        vararg versions: String,
+    ) = Candidate(
+        name = name,
+        displayName = name,
+        kind = if (name == "java") CandidateKind.Jdk else CandidateKind.Sdk,
+        installedVersions =
+            versions.map {
                 CandidateVersion(
                     it,
                     isInstalled = true,
@@ -95,9 +104,9 @@ class EnvironmentSnapshotServiceTest {
                     remoteAvailability = RemoteAvailability.Available,
                 )
             },
-            defaultVersion = default,
-            hasLocalOnlyVersions = false,
-            localOnlyVersionCount = 0,
-            localOnlyVersions = emptyList(),
-        )
+        defaultVersion = default,
+        hasLocalOnlyVersions = false,
+        localOnlyVersionCount = 0,
+        localOnlyVersions = emptyList(),
+    )
 }

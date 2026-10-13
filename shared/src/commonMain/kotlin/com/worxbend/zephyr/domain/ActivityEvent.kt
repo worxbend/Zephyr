@@ -1,13 +1,17 @@
 package com.worxbend.zephyr.domain
 
-enum class ActivitySeverity(val label: String) {
+enum class ActivitySeverity(
+    val label: String,
+) {
     Info("Info"),
     Success("Success"),
     Warning("Warning"),
     Error("Error"),
 }
 
-enum class ActivityAction(val label: String) {
+enum class ActivityAction(
+    val label: String,
+) {
     OpenTaskCenter("Open Task Center"),
 }
 

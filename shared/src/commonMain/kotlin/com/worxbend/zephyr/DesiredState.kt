@@ -10,32 +10,34 @@ internal fun desiredStateFromProfile(profile: ToolchainProfile): DesiredToolchai
     DesiredToolchainState(
         sourceKind = DesiredStateSourceKind.Profile,
         sourceLabel = profile.name.normalizedDesiredSourceLabel(),
-        candidates = profile.targets
-            .distinctBy { it.candidate }
-            .sortedBy { it.candidate }
-            .map {
-                DesiredCandidateState(
-                    candidate = it.candidate,
-                    defaultVersion = it.version,
-                    installedVersions = listOf(it.version),
-                )
-            },
+        candidates =
+            profile.targets
+                .distinctBy { it.candidate }
+                .sortedBy { it.candidate }
+                .map {
+                    DesiredCandidateState(
+                        candidate = it.candidate,
+                        defaultVersion = it.version,
+                        installedVersions = listOf(it.version),
+                    )
+                },
     )
 
 internal fun desiredStateFromSnapshot(snapshot: EnvironmentSnapshot): DesiredToolchainState =
     DesiredToolchainState(
         sourceKind = DesiredStateSourceKind.Snapshot,
         sourceLabel = "Snapshot ${snapshot.capturedAtEpochMillis}",
-        candidates = snapshot.candidates
-            .filter { it.installedVersions.isNotEmpty() }
-            .sortedBy { it.candidate }
-            .map {
-                DesiredCandidateState(
-                    candidate = it.candidate,
-                    defaultVersion = it.defaultVersion,
-                    installedVersions = it.installedVersions.distinct().sorted(),
-                )
-            },
+        candidates =
+            snapshot.candidates
+                .filter { it.installedVersions.isNotEmpty() }
+                .sortedBy { it.candidate }
+                .map {
+                    DesiredCandidateState(
+                        candidate = it.candidate,
+                        defaultVersion = it.defaultVersion,
+                        installedVersions = it.installedVersions.distinct().sorted(),
+                    )
+                },
     )
 
 private const val MAX_DESIRED_SOURCE_LABEL_LENGTH = 80
