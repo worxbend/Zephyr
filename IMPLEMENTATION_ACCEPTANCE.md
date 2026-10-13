@@ -4,7 +4,11 @@ The F01–F18 findings from the review of `84b043d` are fixed and covered by
 regressions. This is an implementation/verification record, not a claim that
 SDKMAN operations are globally transactional or that native releases were tested.
 
-## Final verification
+## Final verification of the architecture pass
+
+This historical record covers the F01–F18 pass. Subsequent document hardening,
+formatter adoption, dependency patching, and current test/coverage evidence are
+recorded in [QUALITY_REVIEW.md](QUALITY_REVIEW.md).
 
 - `./gradlew check --rerun-tasks --console=plain`: successful fresh execution,
   including shared tests, desktop compilation, `architectureCheck` and
@@ -55,7 +59,7 @@ Test class names refer to the corresponding commonTest/jvmTest Kotlin files.
 
 ## Structural acceptance
 
-1. `desktopApp/main.kt` is the production composition root. `AppRuntime` holds
+1. `desktopApp/src/main/kotlin/com/worxbend/zephyr/Main.kt` is the production composition root. `AppRuntime` holds
    injected viewmodel/settings/services and coordinates acknowledged shutdown.
 2. `application/operation/{OperationCoordinator,OperationExecution,OperationRecovery}`
    owns admitted single/batch/profile/snapshot/cleanup work and recovery. UI route

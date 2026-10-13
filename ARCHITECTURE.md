@@ -145,78 +145,83 @@ do not hide genuine violations behind an allowlist.
   deadlines and bounded cleanup. Secret-tool deadlines and missing/unavailable/
   failed outcomes remain distinct. Bind credentials to proxy identity and do
   not place secrets in argv, logs, persisted journals or support exports.
-- Document workflows still expose chooser/read-write common service facades;
-  do not claim the proposed standalone `FileSelection` port is fully extracted.
+- Document workflows retain their common chooser/read-write facades. JVM services
+  inject `DocumentDialogs` and use `UserDocumentFiles` for 1 MiB opened-channel
+  reads, strict UTF-8, leaf-symlink rejection, overwrite confirmation, cancellation
+  checks and atomic same-directory replacement. User directories are not created
+  or chmodded; parent aliases are allowed except for existing project-workspace
+  path validation. Destination-change checks are not hostile-race protection.
+  The proposed standalone common `FileSelection` port is not fully extracted.
 
 ## Verification entry points
 
 ```sh
 python3 -B tools/architecture_check.py
 python3 -B -m unittest discover -s tools -p 'test_architecture_check.py' -v
-./gradlew architectureCheck architectureCheckerTest --console=plain
+./gradlew architectureCheck architectureCheckerTest siteBuilderTest --console=plain
 ./gradlew check --console=plain
 ```
 
 The root `base` lifecycle's `check` explicitly depends on `architectureCheck`,
-`architectureCheckerTest`, `:shared:check` and `:desktopApp:check`. Existing CI
-already invokes root `./gradlew check`; Python 3 is available in its packaging
-steps. The architecture tests use stdlib only and never execute SDKMAN/JVM
-services. Their Gradle scratch root is `build/architecture-tests/scratch`.
+`architectureCheckerTest`, `siteBuilderTest`, `dependencyAuditTest`,
+`kotlinFormatCheck`, `:shared:check` and `:desktopApp:check`. Shared `check` also
+produces `jvmCoverageReport`. Existing CI invokes root `./gradlew check`; Python 3
+is available in its packaging steps. The architecture, dependency-audit helper,
+and site-builder tests use stdlib only and never execute
+SDKMAN/JVM services. Their Gradle scratch roots are
+`build/architecture-tests/scratch` and `build/site-builder-tests/scratch`.
 
 `shared` JVM tests redirect Java preferences to `shared/build/test-preferences`
-and `java.io.tmpdir` to `shared/build/test-fixtures`. Explicit shell/process
+and both `java.io.tmpdir` and `TMPDIR` to `shared/build/test-fixtures`. A caller
+need not supply an ambient `TMPDIR`. Explicit shell/process
 fixtures must also use isolated temporary roots and fake SDKMAN homes; those
 properties do not sandbox arbitrary scripts or Secret Service calls. Retain
 warnings-as-errors, strict dependency verification, CodeQL and separate native
 packaging gates. Application race tests use injected dispatchers and
 `kotlinx-coroutines-test`/suspension gates, not elapsed-time guesses.
 
-## Formatter/static-analysis assessment
+## Formatting, coverage and dependency analysis
 
-No formatter was installed into the build during the concurrent refactor.
-An independent **read-only** ktlint **1.8.0** CLI probe successfully parsed the
-observed Kotlin/Gradle sources and reported **4,184 diagnostics across 170 files**
-in one evolving-checkout snapshot. The largest groups were multiline-expression
-wrapping (932), function signatures (638) and argument wrapping (500); Compose
-function naming also needs intentional configuration. This is substantial
-baseline churn, not a safe immediate whole-tree formatter gate. There is no
-suppression/baseline file and no pretend green formatter check.
+The earlier read-only ktlint probe found 4,184 diagnostics across 170 files.
+That formatting follow-up is now implemented: pinned ktlint 1.8.0 runs through
+`kotlinFormat` and root-gated `kotlinFormatCheck` for Kotlin sources and root/module
+build scripts. `.editorconfig` uses the official style and annotation-aware
+`@Composable` naming. There is no blanket baseline or disabled standard ruleset.
+Six original public action-ID constant names have declaration-only naming
+exceptions to preserve version-1 source compatibility; additive uppercase names
+are used internally. Tests compile and compare the legacy aliases.
 
-Recommended follow-up: a separate reviewed format-only change, with no source
-semantic changes, then add the pinned full check below. Configure Compose
-naming according to ktlint's documented annotation-aware convention rather
-than disabling the standard ruleset. Re-run it on final sources before deciding
-that the formatting change is acceptable. Do not bolt on Detekt's default
-complexity/length thresholds or generate a blanket baseline; evaluate a
-Kotlin-version-compatible pin and individually relevant correctness rules if
-CodeQL, compiler warnings, this checker and runtime tests leave a concrete gap.
-
-Exact plugin-free root implementation after the formatting change:
-
-```kotlin
-val ktlint by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    isTransitive = false // The pinned classifier is the complete executable jar.
-}
-dependencies.add(ktlint.name, "com.pinterest.ktlint:ktlint-cli:1.8.0:all")
-val kotlinFormatCheck by tasks.registering(JavaExec::class) {
-    group = "verification"
-    classpath = ktlint
-    mainClass.set("com.pinterest.ktlint.Main")
-    workingDir(rootDir)
-    args("--reporter=plain", "shared/src/**/*.kt", "desktopApp/src/**/*.kt",
-         "*.gradle.kts", "**/*.gradle.kts")
-}
-tasks.named("check") { dependsOn(kotlinFormatCheck) }
+```sh
+./gradlew kotlinFormat --console=plain
+./gradlew kotlinFormatCheck --console=plain
+./gradlew :shared:jvmCoverageReport --console=plain
+./gradlew dependencyInventory --no-configuration-cache --console=plain
+python3 -B tools/audit_dependencies.py
+./gradlew :shared:performanceProbe --console=plain
 ```
 
-Use Maven Central already declared by settings. Review the downloaded artifact
-and add its checksum to strict `gradle/verification-metadata.xml` before CI.
-The independently downloaded `ktlint-cli-1.8.0-all.jar` SHA-256 was
+Run formatting separately from compilation/tests and review formatting churn
+separately from behavioral changes. Ktlint is resolved from Maven Central with
+strict checksum verification; its complete CLI JAR SHA-256 is
 `369ad2b789f95a011f807e1fcb690ccef80bd7cd014fd139e73ae82dcc0baeab`.
-The CLI and main class were exercised/inspected; the proposed Gradle formatter
-integration itself was not run or applied. No version catalog edit is needed.
+Compiler warnings, architecture checks and CodeQL remain separate correctness
+gates; no arbitrary Detekt complexity policy was introduced.
+
+JaCoCo 0.8.15 produces shared JVM XML/HTML/CSV coverage under
+`shared/build/reports/jacoco/jvmCoverageReport/`, without source exclusions or an
+invented percentage threshold. CI retains test and coverage evidence.
+`dependencyInventory` exports runtime/test/tooling/build-plugin scopes; its task
+uses execution-time resolution, so run that explicit audit without configuration
+cache. OSV network lookup is separate from offline `check` and fails closed on
+incomplete or unsupported results. Kotlin 2.4.21 fixes the confirmed build-plugin
+advisory in 2.4.0; Gradle/Compose pins remain unchanged. Existing verification
+checksums were retained when adding new artifacts.
+
+The optional performance probe measures synthetic filtering, search, bounded
+reads and a task-owned filesystem inventory. It has warmups and samples, but no
+machine-dependent timing assertion, SDKMAN command or network access. It does
+not profile actual UI recomposition. Current metrics, advisory disposition and
+remaining scanner/runtime limitations are in [QUALITY_REVIEW.md](QUALITY_REVIEW.md).
 
 References: [ktlint CLI](https://ktlint.github.io/ktlint/1.8.0/install/cli/),
 [Maven coordinates](https://central.sonatype.com/artifact/com.pinterest.ktlint/ktlint-cli/1.8.0).
@@ -224,13 +229,14 @@ References: [ktlint CLI](https://ktlint.github.io/ktlint/1.8.0/install/cli/),
 ## Acceptance criteria and integration status
 
 The final serialized integration check executed root architecture tasks and
-shared/desktop checks with `./gradlew check --rerun-tasks --console=plain`.
-JUnit XML reports **350 Kotlin/Compose tests in 70 suites**, zero failures,
+shared/desktop checks with
+`env -u TMPDIR ./gradlew check :desktopApp:createDistributable --rerun-tasks --console=plain`.
+JUnit XML reports **373 Kotlin/Compose tests in 73 suites**, zero failures,
 errors or skips. The checker has **31 passing synthetic tests** and scans
 **97 production commonMain files with zero violations**. Packaging contract
 checks separately passed **42 tests** (13 release, 14 Flatpak, 15 Snap).
 
-Desktop `main.kt` constructs every production port and one `AppRuntime` before
+Desktop `Main.kt` constructs every production port and one `AppRuntime` before
 composition. It provides `LocalAppServices` and invokes injected `App`.
 Shutdown replaces route content (disposing feature presenters), joins policy
 collectors, stops operation admission and acknowledges interruption/receipt
@@ -266,6 +272,9 @@ Verified acceptance:
 Verification limits: no real SDKMAN mutation, Secret Service lookup, installed
 native package smoke run, macOS runtime or store publication was performed.
 The process and persistence limits stated above remain deliberate boundaries.
-Whole-tree formatter adoption is deferred by the measured churn assessment;
-it is not represented as a passed gate or hidden by a baseline.
+The production application-image launcher additionally opened a native window
+under an isolated home and absent-SDKMAN fixture. That startup smoke does not
+validate installed packages, screen-reader integration or interactive shutdown.
+The formatter and measured coverage are now verified gates/reporting tasks;
+no mutation score, Sonar result or local CodeQL analysis is claimed.
 

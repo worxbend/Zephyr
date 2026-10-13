@@ -467,7 +467,24 @@ Requires SDKMAN to be installed. If SDKMAN is not detected the app shows an erro
 ### Tests
 
 ```bash
+# Formatting, architecture, JVM tests, and measured coverage
+./gradlew check
+
+# Focused JVM tests or report-only synthetic performance baselines
 ./gradlew :shared:jvmTest
+./gradlew :shared:performanceProbe
+
+# Apply the pinned Kotlin formatter separately from test runs
+./gradlew kotlinFormat
+```
+
+Coverage XML/HTML/CSV is under `shared/build/reports/jacoco/jvmCoverageReport/`.
+Network-based advisory checks are explicit, not part of offline `check`:
+
+```bash
+./gradlew dependencyInventory --no-configuration-cache
+python3 -B tools/audit_dependencies.py
+npm --prefix site audit --ignore-scripts
 ```
 
 Gradle verifies dependency checksums using [`gradle/verification-metadata.xml`](gradle/verification-metadata.xml). Regenerate it only as part of a reviewed dependency update:
@@ -494,6 +511,8 @@ Gradle verifies dependency checksums using [`gradle/verification-metadata.xml`](
 Kotlin Multiplatform + Compose Multiplatform desktop app.
 
 The current technical review and completed hardening work are tracked in [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md). The groomed product backlog, UX direction, and design guardrails are in [PRODUCT_UX_ROADMAP.md](PRODUCT_UX_ROADMAP.md).
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for enforced boundaries and verification contracts, and [QUALITY_REVIEW.md](QUALITY_REVIEW.md) for relevant engineering skills, resolved quality findings, measured evidence, and remaining validation limits.
 
 | Module | Content |
 | --- | --- |
