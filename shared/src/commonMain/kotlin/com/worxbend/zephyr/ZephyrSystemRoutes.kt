@@ -750,7 +750,7 @@ internal fun AboutScreen(state: ZephyrUiState.Ready) {
                 CandidateIcon(CandidateKind.Jdk)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Zephyr", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Version 1.2.3", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Version 1.2.4", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Kotlin Multiplatform + Compose Desktop for Linux", style = MaterialTheme.typography.bodyMedium)
                 }
             }

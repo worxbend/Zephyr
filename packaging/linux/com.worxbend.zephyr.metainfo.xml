@@ -32,6 +32,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.2.4" date="2026-10-13">
+      <description>
+        <p>Improve document safety, activity privacy, and toolchain operation reliability.</p>
+        <ul>
+          <li>Bound imports and atomically export documents after overwrite confirmation.</li>
+          <li>Improve activity-history redaction and accessible page headings.</li>
+          <li>Patch the Kotlin build toolchain and verify native release tests with isolated temporary files.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.3" date="2026-10-11"/>
     <release version="1.2.2" date="2026-10-07"/>
     <release version="1.2.1" date="2026-10-07"/>
